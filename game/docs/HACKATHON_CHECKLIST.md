@@ -63,5 +63,7 @@
 
 ## 6. 本工程待修正
 
+- **P0（9.14 17:05 状态更新）**：线上 Demo 已按用户指令**主动下线**（旧版是 9/12 15:44 快照：`/api/ai/test` 404、`/js/ux.js` 404、`/api/health` 无 `ai` 块、store.js 无 `startJudgeDemo`，而产品说明 §三 把「顶栏评委线」写成评审路径 → 旧版留着反而误导）。实测 `https://qiuzhen-archive-game.app.workbuddy.host/` 与 `/api/health` 均 **404**。→ **当前线上无 Demo，而官方硬要求「Demo 公网可访问可操作」**：提交前必须发布最新版到同一地址并线上复验（发布操作需用户当轮明确授权）。发布记录：`.workbuddy/applications.yaml → wbapp_KxFtFMKWy7pB4ouQ9qBA1K`（已取消发布，App 记录保留，可直接复用同一分享链接重新发布）。
 - README 中"叙事内容创作赛道"应为官方赛道名"跨次元游乐场 · AI 游戏与互动叙事"。
 - API_INTEGRATION.md 中"盐言故事 API"日限额未注明：实际为官方黑客松专用免鉴权接口（见 zhihu-skill/zhihu/references/hackathon-content-api.md），非开放平台鉴权接口。
+- 三赛道口径（官方）：**灵魂匹配局｜社区连接与兴趣社交**、**知识炼金场｜学习工具与知识生产**、**跨次元游乐场｜AI 游戏与互动叙事**；本作主赛道为第三个，`docs/SUBMISSION_产品说明.md §七` 已逐条覆盖另两赛道契合点。

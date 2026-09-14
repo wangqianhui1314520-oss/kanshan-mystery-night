@@ -1,23 +1,24 @@
 
-/* ---------- 创新冲刺：A 信息茧房 / B 证据拼图 / C 策反 / D 求真人格 ---------- */
-.hf-cocoon { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 12px;
-  padding: 8px 12px; border-radius: 10px; background: rgba(255,120,80,.12); border: 1px solid rgba(255,120,80,.4);
-  color: #ffd2bf; font-size: 12.5px; }
-.hf-cocoon b { color: #ff9b6b; }
-.hf-break { flex: none; padding: 6px 12px; border: 0; border-radius: 8px; cursor: pointer;
-  background: linear-gradient(135deg,#5ad1ff,#4da8ff); color: #04122b; font-weight: 700; }
-.hf-break:hover { filter: brightness(1.08); }
-
-.evidence-view { padding: 14px 16px 24px; }
-.ev-board { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
-.ev-col h3 { margin: 0 0 10px; font-size: 14px; color: #cfdcff; letter-spacing: 1px; }
-.ev-nodes { display: flex; flex-direction: column; gap: 8px; }
-.ev-node { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 10px;
-  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); color: #aab8d8; }
-.ev-node b { font-family: Consolas, monospace; color: #8296bd; }
-.ev-node span { flex: 1; font-size: 13px; }
-.ev-node em { font-style: normal; font-size: 10px; padding: 1px 6px; border-radius: 6px; background: rgba(245,196,81,.16); color: #f5c451; }
-.ev-node.core { border-color: rgba(245,196,81,.35); }
+/* ---------- V31.5 房间生命周期事件可视化（player_rejoined / spectator_joined / npc_pending / rt_flow_error） ---------- */
+.rb-chip.spect-chip { color: #7db8ff; border-color: rgba(0, 132, 255, .35); }
+.rb-chip.spect-chip b { color: #a9d4ff; }
+.seat-npc-pending { display: block; color: #ffd76a; font-size: 11px; font-style: normal;
+  animation: rl-blink 1.6s ease-in-out infinite; }
+.room-life-bar { position: fixed; left: 50%; transform: translateX(-50%); top: 74px; z-index: 64;
+  display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px;
+  font-size: 12px; letter-spacing: .5px; white-space: nowrap; max-width: 92vw;
+  overflow: hidden; text-overflow: ellipsis;
+  border: 1px solid rgba(0, 132, 255, .45); color: #bcd8ff;
+  background: rgba(8, 22, 48, .92); backdrop-filter: blur(6px);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .45); }
+.room-life-bar .rl-err { color: #ffc9cf; border-color: transparent;
+  background: none; font-weight: 600; }
+.room-life-bar:has(.rl-err) { border-color: rgba(255, 77, 94, .5); background: rgba(64, 16, 22, .92); }
+.room-life-bar .rl-pending { overflow: hidden; text-overflow: ellipsis; }
+@keyframes rl-blink { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@media (max-width: 640px) { .room-life-bar { top: 96px; font-size: 11px; } }
+-play{font-style:normal;font-size:11px;color:#f5c451}
+{ border-color: rgba(245,196,81,.35); }
 .ev-node.on { background: rgba(0,132,255,.16); border-color: #4da8ff; color: #e7f1ff; box-shadow: 0 0 0 2px rgba(77,168,255,.25); }
 .ev-node.on b { color: #6fe3ff; }
 .ev-meter { margin-top: 12px; }

@@ -20,6 +20,17 @@ import pytest
 # 必须在任何 LLMClient 实例化之前生效（conftest 先于测试模块导入）。
 os.environ.setdefault("LLM_CACHE", "1")
 
+
+@pytest.fixture(autouse=True)
+def _isolated_ai_env(monkeypatch):
+    """测试隔离铁律：每个测试独立清空 AI 凭证，防止前序测试/service 端
+    fallback 写进进程 env 的凭证泄漏到后续 fixture（env 即配置）。
+    同时关闭 server 侧"无配置回落知乎直答"通道（ZHIHU_AI_DEFAULT=0）。"""
+    for key in ("ZHIHU_ACCESS_SECRET", "ZHIHU_APP_KEY", "ZHIHU_ZHIDA_URL",
+                "LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("ZHIHU_AI_DEFAULT", "0")
+
 GAME_ROOT = Path(__file__).resolve().parents[1]
 if str(GAME_ROOT) not in sys.path:
     sys.path.insert(0, str(GAME_ROOT))

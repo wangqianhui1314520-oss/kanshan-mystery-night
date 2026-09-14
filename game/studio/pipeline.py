@@ -113,6 +113,7 @@ def list_jobs() -> list[dict]:
             "title": (job.get("world") or {}).get("title") or d.name,
             "status": job.get("status"),
             "ok": bool((job.get("gate") or {}).get("ok")),
+            "provider": job.get("provider") or "",
             "created_at": job.get("created_at"),
         })
     items.sort(key=lambda x: x.get("created_at") or "", reverse=True)

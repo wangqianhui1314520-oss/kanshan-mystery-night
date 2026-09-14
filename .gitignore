@@ -23,6 +23,7 @@ game/.test-tmp-run2/
 game/tmp_pytest_run/
 game/_party_stress/
 game/frontend/_*.txt
+work_frames/
 
 # ============ WorkBuddy 会话与临时目录 ============
 2026-*/

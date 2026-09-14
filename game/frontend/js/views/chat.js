@@ -190,12 +190,16 @@
       const startInvestigate = () => window.Store.finishStudioBreakIce();
       const askNpcWave = () => window.Store.requestNpcWave && window.Store.requestNpcWave();
 
-      /* AI 来源徽章（契约：chat payload.ai_provider）：含 cache→缓存 / mock→本地 / fallback→兜底 / 其余→AI */
+      /* AI 来源徽章（契约：chat payload.ai_provider）：
+         缓存→缓存 / mock→本地 / fallback→兜底 / zhida→知乎直答 / main→自建模型 / 其余→AI。
+         评委现场由此一眼看出这条台词走的是哪条通道（知乎直答 vs 玩家自设模型）。 */
       const aiSrcBadge = (p) => {
-        const s = String(p || '');
+        const s = String(p || '').toLowerCase();
         if (s.indexOf('cache') >= 0) return { text: '缓存', cls: 'blue' };
         if (s.indexOf('mock') >= 0) return { text: '本地', cls: 'warn' };
         if (s.indexOf('fallback') >= 0) return { text: '兜底', cls: 'warn' };
+        if (s.indexOf('zhida') >= 0) return { text: '知乎直答', cls: 'good' };
+        if (s.indexOf('main') >= 0) return { text: '自建模型', cls: 'blue' };
         return { text: 'AI', cls: '' };
       };
 

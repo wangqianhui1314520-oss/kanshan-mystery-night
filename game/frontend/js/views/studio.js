@@ -225,6 +225,9 @@
             S.studioJob = j.job;
             S.studioId = j.job.id;
             hydrateFromJob(brief, j.job);
+            if (useLlm.value && j.job.provider === 'mock') {
+              window.Store.toast('AI 通道没走通，已自动回退骨架稿（闸门照常校验）', 'warn');
+            }
             window.Store.toast(j.notice || '新本已写成', (j.job.gate && j.job.gate.ok) ? 'good' : 'warn');
             step.value = (j.job.gate && j.job.gate.ok) ? 'play' : 'gate';
             loadHistory();
@@ -259,6 +262,12 @@
         window.Store.playStudio(id);
       };
 
+      const playHistory = (h) => {
+        if (!h || !h.id) return;
+        if (!(h.ok && h.status === 'ready')) { window.Store.toast('这一本闸门未绿，先加载到工作台排查', 'warn'); return; }
+        window.Store.playStudio(h.id);
+      };
+
       const go = (id) => { step.value = id; };
       const next = () => { if (stepIndex.value < visibleSteps.value.length - 1) step.value = visibleSteps.value[stepIndex.value + 1].id; };
       const prev = () => { if (stepIndex.value > 0) step.value = visibleSteps.value[stepIndex.value - 1].id; };
@@ -277,7 +286,7 @@
         S, L, step, useLlm, generating, history, brief, job, world, gate, acts, clues, nodes, culprit, people, bookCovers,
         draftSavedAt, snapshots, showVersions, saveError, visibleSteps, showAdvanced, resultTab, checks, health,
         canPlay, current, typeName, STEPS, PRESETS, PACK_TYPES, MOODS, CORE_MECHS, MECHS, MINIS, ACT_META,
-        pickPreset, pickType, seatOf, generateAll, loadJob, play, go, next, prev, avatarOf, tierLabel, markOf, saveDraft, clearDraft, restoreSnapshot,
+        pickPreset, pickType, seatOf, generateAll, loadJob, play, playHistory, go, next, prev, avatarOf, tierLabel, markOf, saveDraft, clearDraft, restoreSnapshot,
         Store: window.Store
       };
     },
@@ -546,11 +555,21 @@
         <button class="btn-start sw-run" :disabled="generating" @click="generateAll">{{ generating ? '正在写这本新本…' : '生成这本新本' }}</button>
         <button type="button" class="btn-skip" @click="Store.closeStudio()">返回主菜单</button>
         <div class="sw-history" v-if="history.length">
-          <span class="dim tiny">已出的本</span>
-          <button v-for="h in history" :key="h.id" type="button" class="sw-hist-item" @click="loadJob(h.id)">
-            {{ h.title || '未命名本' }} <em :class="h.ok ? 'ok' : 'bad'">{{ h.ok ? '绿' : '红' }}</em>
+          <span class="dim tiny">已出的本
+            <button type="button" class="sw-link" @click="loadHistory">刷新</button>
+          </span>
+          <button v-for="h in history" :key="h.id" type="button" class="sw-hist-item" :title="h.id" @click="loadJob(h.id)">
+            {{ h.title || '未命名本' }}
+            <em :class="h.ok ? 'ok' : 'bad'">{{ h.ok ? '绿' : '红' }}</em>
+            <em v-if="h.provider === 'main'" class="ok">AI</em>
+            <em v-else-if="h.provider === 'mock'" class="dim">骨架</em>
+            <em v-if="h.created_at" class="dim">{{ (h.created_at || '').slice(5, 16).replace('T', ' ') }}</em>
+            <em v-if="h.ok && h.status === 'ready'" style="cursor:pointer;text-decoration:underline;margin-left:6px"
+               role="button" tabindex="0"
+               @click.stop="playHistory(h)" @keydown.enter.stop="playHistory(h)">重开一局 ▸</em>
           </button>
         </div>
+        <p v-else class="dim tiny sw-history-empty">还没有出过本——生成一次后，这里可以浏览、加载和重开你的剧本。</p>
       </footer>
     </div>`
   };

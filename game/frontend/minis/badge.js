@@ -44,6 +44,8 @@
       const profileNote = ref('');
       const alreadyToday = ref(false);
       const prof = ref(null);          // /api/profile/me 结果
+      const authUrl = ref('');         // 服务端下发知乎授权 URL（oauth_configured 时非空）
+      const loginNote = ref('');       // OAuth 登录/回调消费的结果提示
 
       const daySeed = computed(() => hashCode((prof.value ? prof.value.uid : 'guest') + todayKey()));
       const canDraw = computed(() => !alreadyToday.value);
@@ -61,6 +63,7 @@
             return j;
           }
           // 未登录：给 authorize_url 引导（F 返回 oauth_configured）
+          authUrl.value = j.authorize_url || '';
           profileNote.value = (window.Labels ? window.Labels.plain(j.notice, '尚未登录') : (j.notice || '尚未登录'))
             + (j.authorize_url ? '。可前往知乎授权页登录。' : '。先用演示档案抽签。');
         } catch (e) { profileNote.value = '档案局连不上，先用演示档案抽签。'; }
@@ -91,7 +94,22 @@
         report: '今日签：' + drawn.value.fortune
       }).then(r => { if (!r.ok) window.alert(r.notice); });
 
+      const goAuthorize = () => {
+        if (authUrl.value) location.href = authUrl.value;
+      };
+
       onMounted(async () => {
+        // OAuth 回调闭环：oauth.js 捕获的 code 在此消费（有对局才可换登录态）
+        if (window.ZhihuOAuthFlow && window.ZhihuOAuthFlow.hasPendingCode()) {
+          const sid = (window.Store && window.Store.state && window.Store.state.sessionId) || '';
+          const res = await window.ZhihuOAuthFlow.consume(sid, 'player:1');
+          if (res.attempted) {
+            loginNote.value = res.ok ? '知乎授权成功——《特聘侦探证》已签发。' : (res.notice || '登录未完成。');
+            if (!res.ok) console.warn('[badge] OAuth consume failed:', res.notice);
+          } else if (res.notice) {
+            loginNote.value = res.notice;
+          }
+        }
         await fetchProfile();
         try {
           const saved = JSON.parse(localStorage.getItem('kanshan_badge_daily') || 'null');
@@ -99,7 +117,7 @@
         } catch (e) { }
       });
 
-      return { S, phase, drawn, profileNote, alreadyToday, canDraw, draw, doShare };
+      return { S, phase, drawn, profileNote, alreadyToday, canDraw, draw, doShare, authUrl, loginNote, goAuthorize };
     },
     template: `
     <div class="mini-badge">
@@ -108,6 +126,8 @@
         <span class="chip" v-if="prof">已读取公开档案</span>
       </div>
       <p class="dim">{{ profileNote || '只用公开昵称、头像和简介抽签，不读取邮箱或手机。' }}</p>
+      <p v-if="loginNote" class="dim mono">{{ loginNote }}</p>
+      <button v-if="!prof && authUrl" class="btn primary" @click="goAuthorize">前往知乎授权登录 → 签发《特聘侦探证》</button>
 
       <div v-if="phase==='idle' || (phase==='drawing' && !drawn)" class="mb-card">
         <h3>今日侦探签</h3>

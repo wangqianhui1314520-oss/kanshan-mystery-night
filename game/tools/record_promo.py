@@ -8,7 +8,9 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import sys
 import time
 from pathlib import Path
 
@@ -21,6 +23,56 @@ RAW = OUT / "raw"
 BASE = "http://127.0.0.1:8899"
 W, H = 1920, 1080
 MARKS: dict[str, list] = {}
+SERVER_URL = BASE + "/api/health"
+
+
+def _kill_8899() -> None:
+    """清掉占用 8899 的进程（netstat -ano + taskkill，Windows 自带工具）。"""
+    import subprocess
+    try:
+        r = subprocess.run(["netstat", "-ano"], capture_output=True, timeout=15)
+        out = (r.stdout or b"").decode("gbk", errors="replace")
+        pids = set()
+        for ln in out.splitlines():
+            if ":8899" in ln and "LISTENING" in ln.upper():
+                parts = ln.split()
+                if parts and parts[-1].isdigit():
+                    pids.add(parts[-1])
+        for pid in pids:
+            subprocess.run(["taskkill", "/F", "/PID", pid],
+                           capture_output=True, timeout=15)
+    except Exception:
+        pass
+
+
+def ensure_server() -> None:
+    """录制前确保本机服务活着；死了就清端口重启（LLM 指向不存在模型快速回退）。"""
+    import subprocess
+    import urllib.request
+    for _ in range(2):
+        try:
+            urllib.request.urlopen(SERVER_URL, timeout=2)
+            return
+        except Exception:
+            pass
+        _kill_8899()
+        time.sleep(1)
+        subprocess.Popen(
+            [sys.executable, str(GAME / "tools" / "_promo_server.py")],
+            cwd=str(GAME),
+            env={**os.environ,
+                 "ZHIHU_LLM_MODEL": "zhida-agent-unavailable",
+                 "CODEBUDDY_SAFE_DELETE_ENABLED": "0"},
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        for _ in range(30):
+            try:
+                urllib.request.urlopen(SERVER_URL, timeout=2)
+                print("  [server] restarted", flush=True)
+                return
+            except Exception:
+                time.sleep(1)
+    raise SystemExit("本机服务 8899 无法启动")
 
 
 # ----------------------------------------------------------------- 通用小工具
@@ -85,6 +137,21 @@ STYLE = """
 #promo-tag i{width:10px;height:10px;border-radius:50%;background:#0084ff;
   box-shadow:0 0 14px #0084ff}
 #promo-tag span{color:#cfe0ff;font-size:21px;font-weight:700;letter-spacing:.06em}
+#promo-pop{position:absolute;right:44px;top:118px;width:474px;
+  padding:20px 24px 18px;border-radius:14px;
+  background:rgba(7,12,22,.92);border:1px solid rgba(0,132,255,.45);
+  border-left:4px solid #0084ff;
+  box-shadow:0 20px 60px rgba(0,0,0,.55),0 0 44px rgba(0,132,255,.16);
+  backdrop-filter:blur(14px);
+  opacity:0;transform:translateX(28px);transition:opacity .38s ease,transform .38s ease}
+#promo-pop.on{opacity:1;transform:translateX(0)}
+#promo-pop .pp-tag{display:inline-block;padding:4px 14px;border-radius:999px;
+  background:rgba(0,132,255,.16);border:1px solid rgba(0,132,255,.42);
+  color:#4da8ff;font-size:15px;font-weight:700;letter-spacing:.14em;margin-bottom:10px}
+#promo-pop .pp-tt{font-size:31px;font-weight:800;color:#f2f6ff;
+  margin-bottom:8px;letter-spacing:.02em}
+#promo-pop p{margin:0;font-size:19px;line-height:1.58;color:#c3d2ec}
+#promo-pop b{color:#f5c451}
 """
 
 
@@ -144,6 +211,30 @@ def caption(page, text: str, tag: str = "") -> None:
     )
 
 
+def popup(page, tag: str, title: str, body: str, hold: float = 3.0) -> None:
+    """右上角"设计档案"弹窗：介绍设计意图 / 玩法。自动滑入滑出。"""
+    inject(page)
+    page.evaluate(
+        """(d) => {
+      let p = document.getElementById('promo-pop');
+      if (!p) {
+        p = document.createElement('div');
+        p.id = 'promo-pop';
+        const layer = document.getElementById('promo-layer') || document.body;
+        layer.appendChild(p);
+      }
+      p.innerHTML = '<div class="pp-tag">' + d.tag + '</div>'
+        + '<div class="pp-tt">' + d.title + '</div>'
+        + '<p>' + d.body + '</p>';
+      p.classList.add('on');
+    }""",
+        {"tag": tag, "title": title, "body": body},
+    )
+    page.wait_for_timeout(int(hold * 1000))
+    page.evaluate("() => { const p = document.getElementById('promo-pop'); p && p.classList.remove('on'); }")
+    page.wait_for_timeout(430)
+
+
 def caption_off(page) -> None:
     page.evaluate("""() => {
       const c=document.getElementById('promo-cap'); c && c.classList.remove('on');
@@ -158,7 +249,7 @@ def shot(page, name: str) -> None:
         pass
 
 
-def boot_page(browser, tag: str, url: str = BASE, record: bool = True):
+def boot_page(browser, tag: str, url: str = BASE, record: bool = True, wait_menu: bool = True):
     video_dir = RAW / tag
     if video_dir.exists():
         shutil.rmtree(video_dir, ignore_errors=True)
@@ -170,7 +261,10 @@ def boot_page(browser, tag: str, url: str = BASE, record: bool = True):
     ctx.add_init_script("localStorage.clear();localStorage.setItem('kanshan_onboarded_v1','1');")
     page = ctx.new_page()
     page.goto(url, wait_until="domcontentloaded", timeout=45000)
-    page.wait_for_function("() => window.Store && document.querySelector('.card.menu')", timeout=30000)
+    if wait_menu:
+        page.wait_for_function("() => window.Store && document.querySelector('.card.menu')", timeout=30000)
+    else:
+        page.wait_for_function("() => window.Store && window.Store.state", timeout=30000)
     page.wait_for_timeout(900)
     inject(page)
     return ctx, page
@@ -205,8 +299,10 @@ def rec_solo(browser) -> Path:
     page.wait_for_timeout(1800)
     mark(tag, "seat", t0)
     caption(page, "领取身份：<b>9 张嫌疑人卡</b>，一张只写给你看的故事本。", "单人模式")
-    page.wait_for_timeout(3000)
+    page.wait_for_timeout(600)
     shot(page, "solo_1_seat")
+    popup(page, "设计档案 · 01", "身份卡",
+          "一张<b>只写给你</b>的故事本：本幕任务、私密提醒、整活建议。AI 队友也人手一份，互不可见。", hold=3.4)
 
     if not click_btn(page, "确 认"):
         page.evaluate("() => window.Store.startVideo()")
@@ -238,8 +334,10 @@ def rec_solo(browser) -> Path:
 
     # 圆桌：和 AI 说一句话
     caption(page, "圆桌：<b>八个立场不同的当事人</b>。口供会漏，心声漏得更多。", "单人模式")
-    page.wait_for_timeout(2200)
+    page.wait_for_timeout(700)
     shot(page, "solo_3_roundtable")
+    popup(page, "设计档案 · 02", "AI 当事人",
+          "八个<b>知乎生态拟人角色</b>全部由 AI 驱动：有公开口供，也有只在你追问时松口的心声。", hold=3.4)
     box = page.locator(".cs-compose input")
     if box.count():
         box.first.click()
@@ -254,6 +352,8 @@ def rec_solo(browser) -> Path:
         page.wait_for_timeout(2600)
     mark(tag, "chat", t0)
     shot(page, "solo_4_chat")
+    popup(page, "游玩过程 · 圆桌问话", "圆桌问话",
+          "你说的每一句都会被<b>档案局静默记录</b>——前后矛盾的话，之后会被投影上墙对质。", hold=2.9)
 
     # 搜证
     caption(page, "搜证：去现场自己看。关键词一提交，线索当场入袋。", "单人模式")
@@ -287,7 +387,10 @@ def rec_solo(browser) -> Path:
     except PWTimeout:
         shot(page, "solo_5b_map_fail")
         raise SystemExit("搜证面板未出现 —— 见 solo_5b_map_fail.png")
-    page.wait_for_timeout(2600)
+    page.wait_for_timeout(1200)
+    shot(page, "solo_5c_panel")
+    popup(page, "设计档案 · 03", "现场搜证",
+          "输入关键词提交，<b>规则引擎</b>当场判定命中：线索入袋，行动点扣减，不靠 AI 随机编。", hold=3.4)
     # 选关键词（等 AI 回复结束、按钮可用后再提交）
     page.evaluate(
         """() => {
@@ -327,14 +430,17 @@ def rec_solo(browser) -> Path:
     mark(tag, "search", t0)
     shot(page, "solo_6_search")
     caption(page, "监控缺了 <b>21:07 - 21:14</b>。有人先动手，再报警。")
-    page.wait_for_timeout(3000)
+    page.wait_for_timeout(1400)
+    popup(page, "设计档案 · 04", "引擎裁决",
+          "阶段、线索、结局由<b>确定性引擎</b>裁决——AI 只负责演出：永不改判、永不捏造证据。", hold=3.2)
     page.keyboard.press("Escape")
     page.wait_for_timeout(500)
 
     caption(page, "指认、对峙、AI 法官、求真画像 —— 结局由引擎裁决。", "单人模式")
-    page.wait_for_timeout(2800)
+    page.wait_for_timeout(2200)
     caption_off(page)
-    page.wait_for_timeout(600)
+    mark(tag, "done", t0)
+    page.wait_for_timeout(700)
 
     ctx.close()
     v = grab_video(tag)
@@ -367,16 +473,20 @@ def rec_party(browser) -> tuple[Path, Path]:
     print(f"    room={code}", flush=True)
     shot(host, "party_2_host_seat")
     caption(host, f"房间码 <b>{code}</b> · 同一 WiFi 的好友打开链接即可进房。", "联机模式 · 房主视角")
-    host.wait_for_timeout(1800)
+    host.wait_for_timeout(700)
+    popup(host, "游玩过程 · 创建房间", "创建房间",
+          "房主一键建房，生成 <b>6 位房间码</b>与入房链接——不用服务器部署，局域网直连。", hold=3.2)
 
-    ctx_g, guest = boot_page(browser, tag_g, url=f"{BASE}/?room={code}")
+    ctx_g, guest = boot_page(browser, tag_g, url=f"{BASE}/?room={code}", wait_menu=False)
     guest.wait_for_function("() => window.Store && window.Store.state.roomCode", timeout=30000)
     guest.wait_for_timeout(3000)
     inject(guest)
     mark(tag_g, "joined", t0)
     shot(guest, "party_3_guest_seat")
     caption(guest, "队友进来了：<b>实时同步</b>，各自领取嫌疑人身份。", "联机模式 · 队友视角")
-    guest.wait_for_timeout(2600)
+    guest.wait_for_timeout(700)
+    popup(guest, "设计档案 · 05", "AI 补位",
+          "真人来几个就玩几个——空白席位由 <b>AI 嫌疑人</b>补齐：缺谁演谁，永远凑得齐一桌。", hold=3.4)
 
     # 队友选人 → 房主端实时可见
     guest.evaluate(
@@ -388,8 +498,10 @@ def rec_party(browser) -> tuple[Path, Path]:
     )
     guest.wait_for_timeout(1600)
     caption(host, "房主端同步显示：<b>笔上仙 已被领取</b>。", "联机模式 · 房主视角")
-    host.wait_for_timeout(2600)
+    host.wait_for_timeout(600)
     shot(host, "party_4_taken")
+    popup(host, "游玩过程 · 实时同步", "实时同步",
+          "选人、发言、投票全走 <b>WebSocket</b> 实时推送——队友刚坐下，你这边就亮灯。", hold=3.2)
 
     host.evaluate(
         """() => {
@@ -418,21 +530,33 @@ def rec_party(browser) -> tuple[Path, Path]:
             pg.wait_for_function("() => window.Store.state.phase === 'play'", timeout=25000)
         except PWTimeout:
             pass
-    host.wait_for_timeout(1600)
-    for pg in (host, guest):
+        # 跳过"系统提示音"逐句弹窗：跳过开场白 → 下一句 → 领取核验证，直到弹窗消失
+        for _ in range(10):
+            if pg.locator("text=跳过开场白").count():
+                pg.locator("text=跳过开场白").first.click(timeout=2500)
+                pg.wait_for_timeout(800)
+                continue
+            for label in ("下一句", "领取核验证"):
+                if pg.locator("button", has_text=label).count():
+                    pg.locator("button", has_text=label).first.click(timeout=2500)
+                    pg.wait_for_timeout(800)
+                    break
+            else:
+                break
         pg.evaluate("""() => { const S=window.Store.state;
             if (S.showtime && S.showtime.cut) S.showtime.cut=null;
-            if (S.recap) S.recap=null;
-            const c=document.querySelector('.st-casefile'); if (c) c.click(); }""")
-        pg.wait_for_timeout(900)
+            if (S.recap) S.recap=null; }""")
+        pg.wait_for_timeout(800)
         click_btn(pg, "翻开卷宗")
         pg.wait_for_timeout(1200)
     mark(tag_h, "play", t0)
     caption(host, "同一张圆桌：真人队友 + AI 当事人，发言全员可见。", "联机模式 · 房主视角")
     caption(guest, "同一张圆桌：真人队友 + AI 当事人，发言全员可见。", "联机模式 · 队友视角")
-    host.wait_for_timeout(3400)
+    host.wait_for_timeout(800)
     shot(host, "party_5_play_host")
     shot(guest, "party_5_play_guest")
+    popup(host, "设计档案 · 06", "同席对峙",
+          "真人队友与 AI 当事人坐同一张圆桌——发言全员可见，档案局全程留档备查。", hold=3.2)
 
     box = host.locator(".cs-compose input")
     if box.count():
@@ -445,16 +569,19 @@ def rec_party(browser) -> tuple[Path, Path]:
             wait_idle(host, timeout=25000)
         except PWTimeout:
             pass
-    host.wait_for_timeout(2800)
+    host.wait_for_timeout(2400)
     mark(tag_h, "chat", t0)
     shot(host, "party_6_chat_host")
     shot(guest, "party_6_chat_guest")
+    popup(host, "游玩过程 · 跨端对答", "跨端对答",
+          "队友的话<b>实时上桌</b>，AI 当事人即时接话——两块屏幕，一张牌桌。", hold=2.9)
     caption(guest, "队友说的话，<b>同步上桌</b>。")
-    guest.wait_for_timeout(2600)
+    guest.wait_for_timeout(1400)
 
     caption_off(host)
     caption_off(guest)
-    host.wait_for_timeout(600)
+    mark(tag_h, "chat_done", t0)
+    host.wait_for_timeout(700)
     ctx_g.close()
     ctx_h.close()
     vh = grab_video(tag_h)
@@ -472,7 +599,9 @@ def rec_studio(browser) -> Path:
     chapter(page, "CHAPTER 03", "生 产 工 作 台", "一句话，编译出一本可开玩的剧本", hold=2.9)
     caption(page, "不是表单，是<b>创作管线</b>：钩子 → 本型 → 锁局 → 入座 → 真相 → 过闸。", "开发工作台")
     chapter_off(page)
-    page.wait_for_timeout(900)
+    page.wait_for_timeout(500)
+    popup(page, "设计档案 · 10", "创作管线",
+          "十三步工作台把创作拆成流水线——每一步都有草稿与版本，<b>随时回头改</b>。", hold=3.2)
     mark(tag, "menu", t0)
 
     if not click_btn(page, "创作一本新剧本"):
@@ -488,8 +617,10 @@ def rec_studio(browser) -> Path:
         presets.nth(1).click()
         page.wait_for_timeout(1100)
     caption(page, "一句话钩子 —— 整本戏的地基。", "开发工作台")
-    page.wait_for_timeout(1900)
+    page.wait_for_timeout(500)
     shot(page, "studio_2_hook_filled")
+    popup(page, "游玩过程 · 一句话钩子", "一句话钩子",
+          "整本戏从一个梗概开始——<b>预置种子</b>一键起步，会写一句话就会写剧本。", hold=3.0)
 
     # 本型
     page.locator("button.sw-step", has_text="02本型").first.click()
@@ -497,10 +628,12 @@ def rec_studio(browser) -> Path:
     picks = page.locator("button.sw-pick")
     if picks.count() > 2:
         picks.nth(2).click()
-    page.wait_for_timeout(1400)
+    page.wait_for_timeout(900)
     caption(page, "七种本型：机制 / 硬核 / <b>阵营</b> / 情感 / 恐怖 / 综艺 / 沉浸。", "开发工作台")
-    page.wait_for_timeout(2200)
+    page.wait_for_timeout(500)
     shot(page, "studio_3_type")
+    popup(page, "设计档案 · 07", "七种本型",
+          "选型即定配置：<b>机制开关、小游戏、阵营规则、氛围基调</b>一次锁定，创作不用从零调参。", hold=3.4)
     mark(tag, "type", t0)
 
     # 生成
@@ -511,10 +644,12 @@ def rec_studio(browser) -> Path:
     page.locator("button.sw-run").first.click()
     page.wait_for_timeout(1200)
     caption(page, "编译中：地点 / 人物 / 线索链 / 真相树 / 角色本。", "开发工作台")
+    popup(page, "游玩过程 · 一键编译", "一键编译",
+          "点一下，管线<b>几秒钟</b>跑完：地点、线索链、真相树、角色本全部产出。", hold=3.0)
     page.wait_for_function(
         "() => window.Store.state.studioJob && window.Store.state.studioJob.status", timeout=240000
     )
-    page.wait_for_timeout(2200)
+    page.wait_for_timeout(1600)
     mark(tag, "generated", t0)
     job = page.evaluate("""() => {
       const j = window.Store.state.studioJob || {};
@@ -529,17 +664,21 @@ def rec_studio(browser) -> Path:
 
     # 过闸
     page.locator("button.sw-step", has_text="12过闸").first.click()
-    page.wait_for_timeout(1600)
+    page.wait_for_timeout(1400)
     caption(page, "闸门绿：<b>4 人 / 6 地 / 12 条线索</b> —— 结构不达标，不给开玩。", "开发工作台")
-    page.wait_for_timeout(2600)
+    page.wait_for_timeout(600)
+    popup(page, "设计档案 · 08", "闸门",
+          "<b>4 人 / 6 地 / 12 条线索</b>是结构底线——闸门不过就不给开玩，杜绝半成品流入牌桌。", hold=3.4)
     shot(page, "studio_5_gate")
 
     # 开局 + 结果 tabs
     page.locator("button.sw-step", has_text="13开局").first.click()
-    page.wait_for_timeout(1800)
+    page.wait_for_timeout(1400)
     caption(page, "产出的本：海报 / 角色 / 证据 / 导演视角。", "开发工作台")
-    page.wait_for_timeout(1700)
+    page.wait_for_timeout(600)
     shot(page, "studio_6_poster")
+    popup(page, "游玩过程 · 检视产出", "检视产出",
+          "产出的本像一份<b>真正的剧本</b>：海报、角色卡、证据表、导演视角一应俱全。", hold=3.0)
     for label, name in (("角色", "studio_7_cast"), ("证据", "studio_8_evidence"), ("导演视角", "studio_9_director")):
         page.locator(".sw-result-tabs button", has_text=label).first.click()
         page.wait_for_timeout(1900)
@@ -547,15 +686,18 @@ def rec_studio(browser) -> Path:
     mark(tag, "tabs", t0)
 
     caption(page, "写手写不动的量，管线几秒钟跑完。<b>点一下就开玩</b>。", "开发工作台")
-    page.wait_for_timeout(1500)
+    page.wait_for_timeout(1200)
     click_btn(page, "开这本新本")
-    page.wait_for_timeout(3200)
+    page.wait_for_timeout(2600)
     mark(tag, "play", t0)
     shot(page, "studio_10_play")
     caption(page, "新本已在桌上 —— 自己写的本，自己第一个玩。")
-    page.wait_for_timeout(3200)
+    page.wait_for_timeout(1800)
+    popup(page, "设计档案 · 09", "自己的本自己玩",
+          "新本直接入桌、当场开局——<b>玩家即作者</b>，内容生态由此长出来。", hold=3.0)
     caption_off(page)
-    page.wait_for_timeout(600)
+    mark(tag, "done", t0)
+    page.wait_for_timeout(700)
 
     ctx.close()
     v = grab_video(tag)
@@ -585,16 +727,27 @@ def main() -> None:
         which = (sys.argv[1] if len(sys.argv) > 1 else "all").lower()
         if which in ("all", "solo"):
             print("== 段1 单人模式 ==", flush=True)
+            ensure_server()
             rec_solo(browser)
         if which in ("all", "party"):
             print("== 段2 联机模式 ==", flush=True)
+            ensure_server()
             rec_party(browser)
         if which in ("all", "studio"):
             print("== 段3 生产工作台 ==", flush=True)
+            ensure_server()
             rec_studio(browser)
         browser.close()
 
-    (OUT / "marks.json").write_text(json.dumps(MARKS, ensure_ascii=False, indent=2), encoding="utf-8")
+    merged: dict = {}
+    mf = OUT / "marks.json"
+    if mf.exists():
+        try:
+            merged = json.loads(mf.read_text(encoding="utf-8"))
+        except Exception:
+            merged = {}
+    merged.update(MARKS)
+    mf.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"ok": True, "out": str(OUT)}, ensure_ascii=False), flush=True)
 
 

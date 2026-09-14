@@ -7,6 +7,7 @@ from fastapi import HTTPException
 
 from .booklet_svc import vacant_ai_roles, chapter_of
 from .mock_engine import make_event
+from .reply_guard import RETRY_HINT, has_product_identity
 from .safety import check_text
 
 
@@ -110,12 +111,11 @@ async def social_request(server, session_id, body, *, private=False):
                     "memory_state": {"heart_unlocked": unlocked, "blocks": blocks},
                     "must_not_say": library_of(session).merged_hints(cid, chapter).get("must_not", []),
                 })
-                product_markers = ("我是知乎直答", "知乎官方推出的AI搜索产品", "作为一个AI助手")
-                if any(marker in str(reply) for marker in product_markers):
+                if has_product_identity(reply):
                     # 重新请求一次角色化回答，避免把产品介绍展示给玩家。
                     if npc.memory["short_term"]:
                         npc.memory["short_term"].pop()  # 丢弃被作废的首版草稿，只留玩家原话
-                    retry_context = context + "\n【重试指令】上一版是产品介绍，作废。请只用角色第一人称回答，提及一条你的具体经历。"
+                    retry_context = context + "\n" + RETRY_HINT
                     reply = await asyncio.to_thread(npc.respond, prompt, trust=0, context=retry_context)
                     provider = getattr(llm, "last_provider", "")
                 if violations:

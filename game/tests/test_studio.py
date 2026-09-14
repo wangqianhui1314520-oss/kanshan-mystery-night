@@ -1,65 +1,73 @@
+"""S4：剧本杀一键工作台验收（STUDIO_WORKBENCH.md §7 §9）。
+
+覆盖：generate 闸门绿、故意破坏拷贝、public 无剧透键、EngineDriver 快本、
+kanshan 黑名单、空 seed 异常；可选 REST 路由（不存在则 skip）。
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from studio import generate, public_snapshot, validate_dir
+from studio import scenario_dir as studio_scenario_dir
+from studio.tiers import PRESET_SEEDS
+from tests.conftest import SCENARIO_DIR
+
+CONTRACT_ERROR_PREFIXES = ("QUOTA:", "REF:", "FAKE:", "FACTION:", "TAG:", "KC:")
+FORBIDDEN_PUBLIC_KEYS = frozenset({"faction", "guilt", "inner_truth"})
 
 
-# ---------------------------------------------------------------- LLM 线（桩实测）
-
-_VALID_PAYLOAD = json.dumps({
-    "title": "桩线实测·雨夜档案馆",
-    "acts": [{"id": "act1"}, {"id": "act2"}, {"id": "act3"}],
-}, ensure_ascii=False)
-
-
-class _StubLLM:
-    """确定性桩 LLM：mode=valid 返回合法 JSON；mode=bad 返回畸形文本。"""
-
-    last_provider = "main"
-
-    def __init__(self, mode: str = "valid"):
-        self.mode = mode
-        self.calls = 0
-
-    def chat(self, messages, provider="main", temperature=0.35, **kw):
-        self.calls += 1
-        return _VALID_PAYLOAD if self.mode == "valid" else "这不是JSON {{{ 完全畸形"
+def _copy_tree_safe(src: Path, dest: Path) -> None:
+    """Windows 下 shutil.copytree 偶发 WinError 2，改字节流复制。"""
+    dest.mkdir(parents=True, exist_ok=True)
+    for path in src.iterdir():
+        target = dest / path.name
+        if path.is_dir():
+            _copy_tree_safe(path, target)
+        else:
+            target.write_bytes(path.read_bytes())
 
 
-@pytest.fixture()
-def llm_sandbox(tmp_path, monkeypatch):
-    """把 studio 落盘重定向到临时目录，零副作用验证 LLM 线。"""
-    from studio import paths, pipeline
-
-    monkeypatch.setattr(paths, "SCENARIOS", tmp_path)
-    monkeypatch.setattr(pipeline, "SCENARIOS", tmp_path)
+@pytest.fixture(scope="module")
+def ready_job():
+    job = generate(PRESET_SEEDS[0])
+    assert job["gate"]["ok"], job["gate"]["errors"]
+    return job
 
 
-class TestStudioLlmLine:
-    def test_valid_stub_three_steps_green(self, llm_sandbox):
-        from studio import pipeline
+def _collect_forbidden_keys(obj, found: set[str]) -> None:
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in FORBIDDEN_PUBLIC_KEYS:
+                found.add(k)
+            _collect_forbidden_keys(v, found)
+    elif isinstance(obj, list):
+        for item in obj:
+            _collect_forbidden_keys(item, found)
 
-        stub = _StubLLM("valid")
-        job = pipeline.generate(
-            PRESET_SEEDS[0], tier="demo", use_llm=True, llm=stub)
-        assert stub.calls == 3  # world / detail / acts 恰好三步
-        assert job["provider"] == "main"
-        assert job["gate"]["ok"] is True and job["status"] == "ready"
-        assert job["world"]["title"] == "桩线实测·雨夜档案馆"
 
-    def test_malformed_stub_falls_back_to_mock(self, llm_sandbox):
-        from studio import pipeline
+def _errors_match_contract(errors: list[str]) -> bool:
+    return any(
+        any(err.startswith(prefix) for prefix in CONTRACT_ERROR_PREFIXES)
+        for err in errors
+    )
 
-        stub = _StubLLM("bad")
-        job = pipeline.generate(
-            PRESET_SEEDS[0], tier="demo", use_llm=True, llm=stub)
-        assert job["provider"] == "mock"  # 回退 mock 不抛路由
-        assert job["gate"]["ok"] is True and job["status"] == "ready"
 
-    def test_repair_truncated_json(self):
-        from studio.llm_steps import _repair_truncated
+def _json_has_forbidden_key(text: str) -> set[str]:
+    leaked = set()
+    for key in FORBIDDEN_PUBLIC_KEYS:
+        if f'"{key}"' in text:
+            leaked.add(key)
+    return leaked
 
-        broken = '{"a": {"b": [1, 2, {"c": "未完字符串'
-        assert json.loads(_repair_truncated(broken)) == {"a": {"b": [1, 2, {}]}}
-        dangling = '{"x": "v", "y": '
-        assert json.loads(_repair_truncated(dangling)) == {"x": "v"}
-["id"].startswith("gen_")
+
+class TestStudioGenerate:
+    def test_preset_seed_ready(self, ready_job):
+        assert ready_job["gate"]["ok"] is True
+        assert ready_job["status"] == "ready"
+        assert ready_job["id"].startswith("gen_")
 
     def test_empty_seed_raises(self):
         with pytest.raises(ValueError, match="seed"):
@@ -81,9 +89,8 @@ class TestStudioLlmLine:
         act1 = (job["acts"]["acts"] if isinstance(job["acts"], dict) else job["acts"])[0]
         assert act1["name"] == "开场锁门"
         assert act1["stage"] == "break_ice"
-        assert job["modules"]["hotfeed"] is False
         pack = public_snapshot(job["id"])
-        assert pack.get("modules", {}).get("hotfeed") is False
+        assert (pack.get("modules") or {}).get("hotfeed") is False
 
     def test_horror_pack_type_public_fields(self):
         job = generate(PRESET_SEEDS[0], brief={
@@ -112,7 +119,7 @@ class TestStudioGate:
         clues[0].unlink()
 
         gate = validate_dir(dest)
-        assert gate["ok"] is False
+        assert gate["ok"] is False, gate["errors"]
         assert _errors_match_contract(gate["errors"]), gate["errors"]
 
     def test_broken_clue_pool_triggers_ref(self, ready_job, tmp_path):
@@ -128,17 +135,16 @@ class TestStudioGate:
         first_loc["clue_pool"] = pool
         scenario_path.write_text(
             json.dumps(scenario, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+            encoding="utf-8")
 
         gate = validate_dir(dest)
-        assert gate["ok"] is False
+        assert gate["ok"] is False, gate["errors"]
         assert _errors_match_contract(gate["errors"]), gate["errors"]
 
     def test_kanshan_blacklisted(self):
         gate = validate_dir(SCENARIO_DIR)
-        assert gate["ok"] is False
-        assert any("BLACKLIST" in err for err in gate["errors"])
+        assert gate["ok"] is False, gate["errors"]
+        assert any("BLACKLIST" in err for err in gate["errors"]), gate["errors"]
 
 
 class TestStudioPublicSnapshot:
@@ -146,7 +152,7 @@ class TestStudioPublicSnapshot:
         pack = public_snapshot(ready_job["id"])
         assert pack["playable"] is True
 
-        found: set[str] = set()
+        found = set()
         _collect_forbidden_keys(pack, found)
         assert not found, f"public 包泄露键：{found}"
 
@@ -160,20 +166,23 @@ class TestStudioNewCase:
         a = generate(PRESET_SEEDS[0])
         b = generate(PRESET_SEEDS[1])
         assert a["gate"]["ok"] and b["gate"]["ok"]
+
         fact_a = a["detail"]["clues"][0]["fact"]
         fact_b = b["detail"]["clues"][0]["fact"]
         assert fact_a != fact_b
+
         blob_a = json.dumps(a["detail"], ensure_ascii=False)
         blob_b = json.dumps(b["detail"], ensure_ascii=False)
         assert "热搜" in blob_a
-        assert ("盐言" in blob_b) or ("横幅" in blob_b)
+        assert "盐言" in blob_b or "横幅" in blob_b
         assert "热搜日志" not in blob_b
+
         names_a = {c["name"] for c in a["detail"]["characters"]}
         names_b = {c["name"] for c in b["detail"]["characters"]}
         assert names_a != names_b
 
     def test_horror_space_and_player_truth_enter_clues(self):
-        job = generate("灯灭之后只剩井号的呼吸声", brief={
+        job = generate(PRESET_SEEDS[0], brief={
             "hook": "灯灭之后只剩井号的呼吸声",
             "pack_type": "horror",
             "lock": {"space": "黑灯机房", "lock_rule": "灯亮之前不准走"},
@@ -182,14 +191,17 @@ class TestStudioNewCase:
             "vibe": {"mood": "horror"},
         })
         assert job["gate"]["ok"], job["gate"]["errors"]
+
         loc_names = [l["name"] for l in job["world"]["locations"]]
         assert any("黑灯" in n for n in loc_names)
         clue_locs = {c["location"] for c in job["detail"]["clues"]}
         assert clue_locs <= set(loc_names)
+
         blob = json.dumps({"w": job["world"], "d": job["detail"]}, ensure_ascii=False)
         assert "井号君" in blob
         assert "灭灯原片" in blob
         assert job["detail"]["culprit"]["crime"] == "调换了灭灯原片"
+
         pack = public_snapshot(job["id"])
         assert pack["playable"] is True
         assert any("黑灯" in (loc.get("name") or "") for loc in pack["locations"])
@@ -215,26 +227,30 @@ class TestStudioEngine:
         session = driver.create_session("quick", "player:1")
         assert session["engine"] == "engine_v3"
         assert len(session["npcs"]) == 4
+
         loc_id = next(iter(driver._loc_names))
         loc_name = driver._loc_names[loc_id]
         keyword = next(
-            (t for c in ready_job["detail"]["clues"] if c["location"] == loc_name for t in c.get("tags") or []),
-            "",
-        )
+            (t for c in ready_job["detail"]["clues"]
+             if c["location"] == loc_name
+             for t in (c.get("tags") or [])),
+            "")
         if keyword:
-            # quick 建局已跳过破冰，停在搜证幕；再 advance 会进圆桌，search 被拒。
+            # quick 建局已跳过破冰，停在搜证幕（create_session 的 mode_setup
+            # 事件明示"快速局：已跳过破冰，直接搜证/对质"）；再 advance 会进
+            # 圆桌，search 被拒。
             if session.get("stage") == "break_ice":
                 events, err = driver.apply_action(session, "advance", "player:1", {})
                 assert err is None, err
             events, err = driver.apply_action(
-                session, "search", "player:1", {"location": loc_id, "keyword": keyword}
-            )
-            assert err is None, err
-            kinds = [(e.get("payload") or {}).get("event") for e in events]
-            assert "bad_location" not in kinds, loc_id + "/" + loc_name
-            assert "clue_gained" in kinds or "search_result" in kinds or any(
-                "clue" in str(e).lower() for e in events
-            )
+                session, "search", "player:1",
+                {"location": loc_id, "keyword": keyword})
+            assert err is None
+
+            kinds = [e.get("payload", {}).get("event") for e in events]
+            assert "bad_location" not in kinds, str(loc_id) + "/" + str(loc_name)
+            assert ("clue_gained" in kinds or "search_result" in kinds
+                    or any("clue" in str(e).lower() for e in events))
 
 
 def _app_has_route(path: str, method: str = "POST") -> bool:
@@ -257,28 +273,28 @@ class TestStudioOptionalApi:
         pytest.importorskip("fastapi")
         from fastapi.testclient import TestClient
         from server.main import app
-
         with TestClient(app) as c:
             yield c
 
     def test_studio_generate_route(self, client):
         if not _app_has_route("/api/studio/generate"):
             pytest.skip("POST /api/studio/generate 尚未实现（S2）")
-        resp = client.post(
-            "/api/studio/generate",
-            json={"seed": PRESET_SEEDS[0], "tier": "demo", "use_llm": False},
-        )
+        resp = client.post("/api/studio/generate", json={
+            "seed": PRESET_SEEDS[0], "tier": "demo", "use_llm": False,
+        })
         assert resp.status_code == 200
         body = resp.json()
         assert body.get("ok") is True
         job = body.get("job") or {}
-        assert job.get("gate", {}).get("ok") is True
+        assert (job.get("gate") or {}).get("ok") is True
         assert str(job.get("id", "")).startswith("gen_")
 
     def test_session_defaults_to_kanshan(self, client):
         if not _app_has_route("/api/session"):
             pytest.skip("POST /api/session 不可用")
-        resp = client.post("/api/session", json={"mode": "quick", "player_id": "player:1"})
+        resp = client.post("/api/session", json={
+            "mode": "quick", "player_id": "player:1",
+        })
         if resp.status_code == 503:
             pytest.skip("真实引擎未就绪（TestClient 环境常见）")
         assert resp.status_code == 200

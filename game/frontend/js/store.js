@@ -413,15 +413,10 @@
     const q = [];
     if (pid) q.push('player_id=' + encodeURIComponent(pid));
     if (spectator) q.push('spectator=1');
-    // FastAPI 游戏服务默认监听 8899；前端若从旧静态端口打开，也要回指游戏服务。
-    let origin = location.origin;
-    try {
-      const h = location.hostname;
-      const p = String(location.port || (location.protocol === 'https:' ? '443' : '80'));
-      if ((h === 'localhost' || h === '127.0.0.1') && p !== '8899') {
-        origin = location.protocol + '//127.0.0.1:8899';
-      }
-    } catch (e) { /* 保持当前 origin */ }
+    // 单端口部署（M4）：前端与 API 同源同端口，WS 直接用本页 origin。
+    // 旧版在这里硬编码回指 127.0.0.1:8899 —— 服务换端口后 WS 全部断连
+    // （表现为"API 连接丢失"），已废弃该回指；跨端口打开请用 /api/lan-info。
+    const origin = location.origin;
     return origin.replace(/^http/, 'ws') + '/ws/' + sid + (q.length ? '?' + q.join('&') : '');
   }
   async function resolveShareBase() {
@@ -1528,6 +1523,13 @@
     const ev = p.event;
     if (!ev) return;
     const chName = cid => Labels.who(cid);
+    /* 头条竞价出价者显示名：复用 Labels.who（既有玩家名解析），本人特判为「你」 */
+    const hlBidderName = id => {
+      if (!id) return '神秘人';
+      if (id === (state.playerId || 'player:1')) return '你';
+      const nm = chName(id);
+      return nm && nm !== '在场者' ? nm : String(id);
+    };
     switch (ev) {
       case 'case_intro':
         state.caseIntro = { title: p.title, summary: p.summary, attribution: p.attribution };
@@ -1657,13 +1659,70 @@
         delete state.er[p.char_id];
         toast(p.text, 'warn');
         break;
-      /* 头条竞标 */
+      /* 头条竞标：新契约 window_id 竞价轮次（headline_open/bid/outbid/settle）；
+         无 window_id 走本地演示单话题开盘（一次性结算，行为不变） */
       case 'headline_open':
         playSfx('ding');
         playSfx('auction');
-        state.headline = { round: state.round, topic: p.topic, note: p.note, bids: [], settled: false, winner: null };
-        banner(p.text, 'headline');
+        if (p.window_id && Array.isArray(p.topics)) {
+          state.headline = {
+            mode: 'auction', windowId: p.window_id, round: p.round || state.round,
+            topics: p.topics.slice(), minBid: p.min_bid || 1,
+            deadlineTs: p.deadline_ts || null, deadlineIn: p.deadline_in || 0,
+            openedAt: Date.now(), bids: [], top: null, topAmount: 0,
+            settled: false, winner: null, result: null
+          };
+          banner('头条竞价窗口开启：' + p.topics.length + ' 个话题，底价 ' + state.headline.minBid + 'AP', 'headline');
+          chat('sys', '【头条竞价】窗口已开——出价=行动点，按底价 ' + state.headline.minBid + 'AP 步进，被反超可加价或弃拍。', { kind: 'clue' });
+          pushDmaku(['竞价开始了', '头条不等人', '拍下它'], 'sys');
+        } else {
+          state.headline = { round: state.round, topic: p.topic, note: p.note, bids: [], settled: false, winner: null };
+          banner(p.text, 'headline');
+        }
         break;
+      case 'headline_bid':
+        if (state.headline && state.headline.mode === 'auction' && (!p.window_id || p.window_id === state.headline.windowId)) {
+          state.headline.bids = state.headline.bids || [];
+          state.headline.bids.push({ who: p.bidder, amount: p.amount });
+          if (p.is_top) {
+            state.headline.top = p.bidder;
+            state.headline.topAmount = p.top_amount !== undefined ? p.top_amount : p.amount;
+            if (p.bidder === (state.playerId || 'player:1')) toast('你的出价目前领先：' + p.amount + 'AP', 'good');
+          }
+        }
+        break;
+      case 'headline_outbid':
+        if (state.headline && state.headline.mode === 'auction' && (!p.window_id || p.window_id === state.headline.windowId)) {
+          state.headline.top = p.bidder;
+          state.headline.topAmount = p.new_amount;
+          const meId = state.playerId || 'player:1';
+          if (p.prev_bidder === meId || p.prev_bidder === 'player:1') {
+            playSfx('miss');
+            toast('你的出价被 ' + hlBidderName(p.bidder) + ' 反超（当前最高 ' + p.new_amount + 'AP）', 'warn');
+            pushDmaku(['手速被针对了', '加价还是弃拍？'], 'sys');
+          }
+        }
+        break;
+      case 'headline_settle': {
+        playSfx('heat');
+        const meId2 = state.playerId || 'player:1';
+        const line = p.winner
+          ? '叮——头条成交：《' + (p.topic_title || '话题') + '》由 ' + hlBidderName(p.winner) + ' 以 ' + p.amount + 'AP 拍下。'
+          : '叮——流拍。头条位空着，热度自己涨了——热搜从来不等谁。';
+        if (state.headline && state.headline.mode === 'auction') {
+          state.headline.settled = true;
+          state.headline.closed = true;          // 关竞价窗口，面板回结算展示态
+          state.headline.winner = p.winner || null;
+          state.headline.topicTitle = p.topic_title || '';
+          state.headline.cost = p.amount || 0;
+          state.headline.effect = p.effect || null;
+          state.headline.result = line;
+        }
+        banner(line, p.winner === meId2 ? 'headline' : 'warn');
+        chat('sys', '【头条竞价】' + line, { kind: p.winner === meId2 ? 'counsel' : 'warn' });
+        pushDmaku(p.winner ? ['成交！', '头条易主'] : ['流拍了', '热搜自己涨'], 'sys');
+        break;
+      }
       case 'headline_result':
         playSfx('heat');
         state.headline = state.headline || { round: state.round, topic: '', bids: [], settled: false };

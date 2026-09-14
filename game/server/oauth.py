@@ -48,11 +48,16 @@ class ZhihuOAuth:
         return bool(self.app_id and self.app_key and self.redirect_uri)
 
     def authorize_url(self) -> str:
-        """前端跳转用授权 URL（App ID 为公开配置，可回传前端）。"""
-        if not self.app_id:
+        """前端跳转用授权 URL（App ID 为公开配置，可回传前端）。
+
+        redirect_uri 必须按文档 URL 编码（oauth.md §授权页面），否则含查询参数
+        或特殊字符的回调地址会被服务端截断。
+        """
+        if not (self.app_id and self.redirect_uri):
             return ""
+        from urllib.parse import quote
         return (f"{self.openapi_base}/authorize?response_type=code"
-                f"&app_id={self.app_id}&redirect_uri={self.redirect_uri}")
+                f"&app_id={self.app_id}&redirect_uri={quote(self.redirect_uri, safe='')}")
 
     @staticmethod
     def _diag(secret: str) -> str:

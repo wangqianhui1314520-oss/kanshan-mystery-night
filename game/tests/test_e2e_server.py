@@ -20,7 +20,7 @@ from tests.conftest import GAME_ROOT
 
 pytestmark = pytest.mark.e2e
 
-PORT = 8917
+PORT = int(os.environ.get("ZHIHU_GAME_E2E_PORT") or 8917)  # 多会话并发跑 e2e 时可错开端口
 BASE = f"http://127.0.0.1:{PORT}"
 CULPRIT = "char_01"
 

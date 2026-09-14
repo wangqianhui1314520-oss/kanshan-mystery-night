@@ -738,11 +738,12 @@ class AgentRuntime:
         result = self.memory.broadcast_accident(candidates)
         return self.show.broadcast_accident(engine_result=result)
 
-    def collect_flow(self, item_id: str, act_no: int | None = None) -> dict:
+    def collect_flow(self, item_id: str, act_no: int | None = None,
+                     actor: str | None = None) -> dict:
         """鱼干收集品拾取（CollectiblesBoard，0AP，彩蛋层不进证据链）；
-        集齐 → unlock_payload → 看山Bot 隐藏语音演出。"""
+        集齐 → unlock_payload → 看山Bot 隐藏语音演出。actor 缺省=真人（AI 席可传 ai:xx）。"""
         act_no = act_no or max(1, self.stage_machine._index + 1)
-        result = self.cb.collect(self.player_id, item_id, act_no=act_no)
+        result = self.cb.collect(actor or self.player_id, item_id, act_no=act_no)
         if result.get("all_collected") and result.get("unlock"):
             result["show"] = self.show.collectibles_show(result["unlock"])
         return result
@@ -766,19 +767,24 @@ class AgentRuntime:
         return out
 
     # ================================================== P2 暗拍 / 拼图 / 终局陈词（ae.record 接线）
-    def stealth_photo_flow(self, location: str, keyword: str) -> dict:
+    def stealth_photo_flow(self, location: str, keyword: str,
+                           actor: str | None = None) -> dict:
         """暗拍链（2AP 由上层扣）：引擎 stealth_photo（线索留原地）→ ok 计数 +
-        ae.record("photos_shared")（暗房大师素材，resolver 徽章消费）。"""
-        result = self.evidence.stealth_photo(location, keyword, self.player_id,
+        ae.record("photos_shared")（暗房大师素材，resolver 徽章消费）。
+        actor 缺省=真人（AI 坐席传 ai:char_xx 即可由 AI 执行）。"""
+        result = self.evidence.stealth_photo(location, keyword,
+                                             actor or self.player_id,
                                              round_no=self.stage_machine.round_no())
         if result.get("ok"):
             self.counters["photos_shared"] += 1
             self.ae.record("photos_shared", value=1)
         return result
 
-    def share_photo_flow(self, photo_id: str, claim: str | None = None) -> dict | None:
-        """照片分享（可说谎：引擎登记原文+声称，真伪留圆桌对质）。"""
-        return self.evidence.share_photo(self.player_id, photo_id, claim=claim)
+    def share_photo_flow(self, photo_id: str, claim: str | None = None,
+                         actor: str | None = None) -> dict | None:
+        """照片分享（可说谎：引擎登记原文+声称，真伪留圆桌对质）。actor 缺省=真人。"""
+        return self.evidence.share_photo(actor or self.player_id, photo_id,
+                                         claim=claim)
 
     def puzzle_flow(self, char_id: str, proposal: list[str]) -> dict:
         """记忆拼图对质链：发起成本 spend_tamper_points(2)（引擎校验）→

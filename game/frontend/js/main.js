@@ -294,6 +294,7 @@
             conn.transport = S.netKind || '';
             conn.state = S.netKind === 'ws' ? 'online' : 'idle';
             if (window.Net.on) window.Net.on('_status', window.__connStatusHook);
+            wireRoomLifecycle();
             window.Store.chat('dm', '叮——已连入房间 ' + roomParam + '。不出真相，不出此门。', {});
           }
           wireMinisHash();
@@ -309,6 +310,7 @@
           conn.transport = info.mode || '';
           conn.state = info.mode === 'ws' ? 'online' : 'idle';
           window.Net.on('_status', window.__connStatusHook);
+          wireRoomLifecycle();
           ['search_result', 'clue_gained', 'chat', 'memory_unlock', 'counsel_result', 'hotfeed_refresh', 'faction_skill', 'vote', 'ending', 'danmaku', 'system', 'achievement_unlocked', 'cocoon_break', 'evidence_pin', 'defect']
             .forEach(t => window.Net.on(t, evt => window.Store.applyEvent(evt)));
         } else if (location.protocol === 'file:') {
@@ -318,6 +320,7 @@
           conn.state = 'idle';
           ['search_result', 'clue_gained', 'chat', 'memory_unlock', 'counsel_result', 'hotfeed_refresh', 'faction_skill', 'vote', 'ending', 'danmaku', 'system', 'achievement_unlocked', 'cocoon_break', 'evidence_pin', 'defect']
             .forEach(t => window.Net.on(t, evt => window.Store.applyEvent(evt)));
+          wireRoomLifecycle();
         } else {
           conn.transport = '';
           conn.state = 'idle';
@@ -371,6 +374,38 @@
         voiceAuto.value = !voiceAuto.value;
         if (window.Voice) window.Voice.setAutoSend(voiceAuto.value);
       };
+      /* ---- 房间生命周期事件可视化（player_rejoined / spectator_joined / npc_pending / rt_flow_error）
+       * 服务端经 system 事件下发（server/main.py）。不改 store.js：在此经 Net.on('system') 叠加订阅，
+       * 不影响 store 既有分发。mock/file:// 通道不产出这些事件 → 状态恒空，UI 不显示任何占位。 ---- */
+      const roomLife = Vue.reactive({ spectators: 0, npcPending: '', npcPendingTimer: null, flowError: '', flowErrorTimer: null });
+      const lifecycleWho = (pid, seats) => {
+        const seat = (seats || []).find(s => s && s.player_id === pid && s.char_id) || null;
+        return (seat && window.Labels && window.Labels.who(seat.char_id)) || '一位队友';
+      };
+      const wireRoomLifecycle = () => {
+        if (!window.Net || !window.Net.on) return;
+        window.Net.on('system', (evt) => {
+          const p = (evt && evt.payload) || {};
+          if (p.event === 'player_rejoined') {
+            window.Store.toast(lifecycleWho(p.player_id, p.seats) + ' 已重新连入房间，席位恢复', 'ok');
+          } else if (p.event === 'spectator_joined') {
+            roomLife.spectators += 1;
+            window.Store.toast('一位旁听者进入了房间', 'ok');
+          } else if (p.event === 'npc_pending') {
+            roomLife.npcPending = String(p.target || '').replace(/^npc:/, '');
+            clearTimeout(roomLife.npcPendingTimer);
+            roomLife.npcPendingTimer = setTimeout(() => { roomLife.npcPending = ''; }, 12000);
+          } else if (p.event === 'rt_flow_error') {
+            roomLife.flowError = p.notice || '演出流程异常';
+            clearTimeout(roomLife.flowErrorTimer);
+            roomLife.flowErrorTimer = setTimeout(() => { roomLife.flowError = ''; }, 9000);
+          }
+        });
+      };
+      const npcPendingName = computed(() => {
+        const c = (M.chars || []).find(x => x.id === roomLife.npcPending) || {};
+        return c.name || 'AI';
+      });
       const VoiceRTC = window.VoiceRTC;
       const rtcLive = ref(false);
       const rtcListen = ref(false);
@@ -438,7 +473,8 @@
           const taken = !!(owner && owner !== mine && seat.is_ai === false);
           return Object.assign({}, c, {
             taken: taken,
-            mine: owner === mine || S.partyChar === c.id
+            mine: owner === mine || S.partyChar === c.id,
+            pending: !!(roomLife.npcPending && roomLife.npcPending === c.id)
           });
         });
       });
@@ -544,10 +580,38 @@
       /* 入座页「推荐你选 TA」标记：仅单人主模式/房间选人时显示，不拦截 Store.pickPartyChar */
       const soulMatchId = computed(() => (S.phase === 'seat' && showSeatRoles.value && soulQuiz.result) ? soulQuiz.result : '');
 
+      /* ---- 我的剧本架：主菜单选局入口（一句话生成 → 随时回放闭环） ---- */
+      const shelfOpen = ref(false);
+      const shelfState = ref('idle'); /* idle | loading | ready | offline */
+      const shelfItems = ref([]);
+      const loadShelf = async () => {
+        shelfState.value = 'loading';
+        try {
+          const r = await fetch('/api/studio');
+          if (!r.ok) throw new Error('http ' + r.status);
+          const j = await r.json();
+          shelfItems.value = (j && j.ok && Array.isArray(j.items)) ? j.items : [];
+          shelfState.value = 'ready';
+        } catch (e) {
+          shelfItems.value = [];
+          shelfState.value = 'offline'; /* file:// 直开或服务端未启动：空态，不报错 */
+        }
+      };
+      const shelfToggle = () => {
+        shelfOpen.value = !shelfOpen.value;
+        if (shelfOpen.value) loadShelf();
+      };
+      const shelfPlayable = (it) => !!it && !!it.ok && it.status === 'ready';
+      const shelfTime = (t) => (t || '').slice(5, 16).replace('T', ' ');
+      const shelfPlay = (it) => {
+        if (!shelfPlayable(it)) { window.Store.toast('这一本闸门未通过，暂不可开玩——可到创作工作台排查', 'warn'); return; }
+        window.Store.playStudio(it.id);
+      };
+
       boot();
 
       const L = window.Labels;
-      return { ai, aiSeats, aiDecision, S, M, L, hostOpen, goalOpen, hostAdvance, taskCard, openTaskCard, booted, bootMsg, settings, leaveAsk, settingsAdv, askLeave, confirmLeave, wsUrl, actName, flawN, kcOwned, erN, navGo, dossierOpen, joinCode, copyShare, achOpen, helpOpen, aboutOpen, apiForm, saveApi, ACH_IMG, elevatorDone, Store: window.Store, VIEWS: window.VIEWS, CUT_LINES, CASE_BRIEF, caseBrief, caseTitle, chapter, menuItems, utilityItems, cutLine, playSkin, showHeat, showKcards, showFlaw, showZans, rail, railOn, prog, pacingHint, dmTasks, dmNext, dmAction, doDmAction, dmMini, openDmMini, goNextChapter, eng, conn, connText, engineSource, transportSource, recheckEngine, retryConn, guideOpen, replayGuide, guideDone, cutVidErr, audioMuted, toggleAudio, Voice, voiceOut, voiceIn, voiceAuto, toggleVoiceOut, toggleVoiceIn, toggleVoiceAuto, seatBookChars, seatRolePack, showSeatRoles, seatRoles, soulQuiz, SOUL_QUESTIONS, soulOpen, soulPick, soulRetake, soulSkip, soulResult, soulMatchId, VoiceRTC, rtcLive, rtcListen, rtcJoin, rtcLeave };
+      return { ai, aiSeats, aiDecision, S, M, L, hostOpen, goalOpen, hostAdvance, taskCard, openTaskCard, booted, bootMsg, settings, leaveAsk, settingsAdv, askLeave, confirmLeave, wsUrl, actName, flawN, kcOwned, erN, navGo, dossierOpen, joinCode, copyShare, achOpen, helpOpen, aboutOpen, apiForm, saveApi, ACH_IMG, elevatorDone, Store: window.Store, VIEWS: window.VIEWS, CUT_LINES, CASE_BRIEF, caseBrief, caseTitle, chapter, menuItems, utilityItems, cutLine, playSkin, showHeat, showKcards, showFlaw, showZans, rail, railOn, prog, pacingHint, dmTasks, dmNext, dmAction, doDmAction, dmMini, openDmMini, goNextChapter, eng, conn, connText, engineSource, transportSource, recheckEngine, retryConn, guideOpen, replayGuide, guideDone, cutVidErr, audioMuted, toggleAudio, Voice, voiceOut, voiceIn, voiceAuto, toggleVoiceOut, toggleVoiceIn, toggleVoiceAuto, seatBookChars, seatRolePack, showSeatRoles, seatRoles, soulQuiz, SOUL_QUESTIONS, soulOpen, soulPick, soulRetake, soulSkip, soulResult, soulMatchId, VoiceRTC, rtcLive, rtcListen, rtcJoin, rtcLeave, shelfOpen, shelfState, shelfItems, shelfToggle, loadShelf, shelfPlayable, shelfTime, shelfPlay, roomLife, npcPendingName };
     },
     template: `
         <!-- 开场覆盖层：封面 → DM 开场 → 领取侦探证（剧本杀标准流程） -->
@@ -586,6 +650,26 @@
         <button v-if="S.hasSave" class="btn-start alt" @click="Store.resumeGame()">继续上次对局 ▸</button>
         <button class="btn-start" @click="Store.chooseMode('solo')">开 始 调 查</button>
         <button class="btn-start studio-entry" @click="Store.openStudio()">创作一本新剧本 ▸</button>
+        <button class="btn-start alt shelf-entry" @click="shelfToggle">{{ shelfOpen ? '收起我的剧本架 ▴' : '我的剧本架 ▾' }}</button>
+        <section class="menu-shelf" v-if="shelfOpen" aria-label="我的剧本架">
+          <p class="dim tiny" v-if="shelfState === 'loading'">正在拉取剧本架…</p>
+          <p class="dim tiny" v-else-if="shelfState === 'offline'">需在线服务端可用后加载剧本架 <a href="#" @click.prevent="loadShelf">重试</a></p>
+          <template v-else-if="shelfState === 'ready'">
+            <p class="dim tiny" v-if="!shelfItems.length">书架还空着——<a href="#" @click.prevent="Store.openStudio()">去创作工作台用一句话生成你的第一本 ▸</a></p>
+            <div class="shelf-list" v-else>
+              <button type="button" v-for="it in shelfItems" :key="it.id" class="shelf-item"
+                      :class="{ playable: shelfPlayable(it) }" :title="it.id" @click="shelfPlay(it)">
+                <b>{{ it.title || '未命名本' }}</b>
+                <span class="shelf-meta">
+                  <em class="shelf-tag" :class="it.provider === 'main' ? 'ai' : 'mock'">{{ it.provider === 'main' ? 'AI 稿' : '骨架稿' }}</em>
+                  <em class="shelf-tag" :class="shelfPlayable(it) ? 'ok' : 'bad'">{{ shelfPlayable(it) ? '可玩' : '闸门未过 · 暂不可玩' }}</em>
+                  <em class="shelf-tag dim" v-if="it.created_at">{{ shelfTime(it.created_at) }}</em>
+                  <em class="shelf-play" v-if="shelfPlayable(it)">开本 ▸</em>
+                </span>
+              </button>
+            </div>
+          </template>
+        </section>
         <div class="menu-modes">
           <button class="btn-start alt" @click="Store.chooseMode('daily')">每日挑战</button>
           <button class="btn-start alt" @click="Store.chooseMode('quick')">快速局</button>
@@ -680,6 +764,7 @@
                       :disabled="c.taken" @click="Store.pickPartyChar(c.id)">
                 <img :src="c.avatar" :alt="c.name"><b>{{ c.name }}</b>
                 <span v-if="c.taken">已被领取</span>
+                <em v-else-if="c.pending" class="seat-npc-pending">AI 补位中…</em>
                 <em v-if="soulMatchId === c.id" style="display:block;color:#ffd76a;font-size:11px;font-style:normal;">★ 灵魂同频 · 推荐你选 TA</em>
               </button>
             </div>
@@ -778,6 +863,7 @@
           <span class="rb-chip zans" v-if="showZans" :class="{on: S.bet && S.bet.open}" title="押注币=赞数（弹幕押注）"><i>赞数</i><ux-num :value="S.zans"></ux-num></span>
           <span class="rb-chip er" :class="{hot: erN>0}" v-if="erN>0" title="急诊红灯：下一轮内对口卡抢救=双倍"><i>红灯</i><b>🚨 {{ erN }}</b></span>
           <span class="rb-chip" v-if="S.pollution && S.pollution.ammo" title="污染对照赢得的辟谣弹药"><i>弹药</i><ux-num :value="S.pollution.ammo"></ux-num></span>
+          <span class="rb-chip spect-chip" v-if="roomLife.spectators > 0 || S.isSpectator" title="旁听观战者（有人进入房间时实时+1）"><i>👀</i><b>旁听 {{ roomLife.spectators + (S.isSpectator ? 1 : 0) }}</b></span>
         </div>
         <div class="rb-actions">
           <button v-if="!S.isSpectator" class="rb-btn goal-entry" :class="{on: goalOpen}" @click="openTaskCard" aria-label="我的目标卡">目标卡</button>
@@ -831,6 +917,12 @@
         <i class="uxs-spin" v-if="conn.state === 'reconnecting'" aria-hidden="true"></i>
         <span>{{ connText }}</span>
         <button type="button" @click="retryConn">立即重连</button>
+      </div>
+
+      <!-- 房间生命周期提示：AI 演出占位（npc_pending）/ 圆桌流程错误（rt_flow_error） -->
+      <div class="room-life-bar" v-if="roomLife.npcPending || roomLife.flowError" role="status" aria-live="polite">
+        <span class="rl-err" v-if="roomLife.flowError">⚠ 流程错误：{{ roomLife.flowError }}</span>
+        <span class="rl-pending" v-else>⏳ 「{{ npcPendingName }}」的 AI 演出补位中…（确定性联动已结算，台词稍后补上）</span>
       </div>
 
       <!-- 全局横幅 -->

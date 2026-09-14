@@ -77,13 +77,41 @@
         emotion: p.pinned ? 55 : 45
       };
 
-      /* 头条竞标 */
+      /* 头条竞标（旧单次出价路径：本地演示/mock 保留原样） */
       const bidAmount = ref(1);
       const hl = computed(() => S.headline);
       const doBid = () => {
         if (!targetPost.value) return;
         window.Store.send('skill', { kind: 'bid_headline', post: targetPost.value.id, topic: targetPost.value.title, amount: Number(bidAmount.value) });
       };
+      /* 竞价轮次态：仅当服务端 headline_open(window_id) 到达时启用（ui.js countdown-ring 只调用不改） */
+      const auctionLive = computed(() => !!(hl.value && hl.value.mode === 'auction' && !hl.value.settled));
+      const aucTopic = ref('');
+      const aucAmount = ref(1);
+      const aucOver = ref(false);
+      const minStep = computed(() => (hl.value && hl.value.minBid) || 1);
+      const aucFloor = computed(() => {
+        const top = (hl.value && hl.value.topAmount) || 0;
+        return Math.max(minStep.value, top + minStep.value);
+      });
+      const bidName = id => !id ? '神秘人' : (id === (S.playerId || 'player:1') ? '你' : ((window.Labels && window.Labels.who(id)) || id));
+      watch(auctionLive, live => {
+        if (live) {
+          aucOver.value = false;
+          aucAmount.value = (hl.value && hl.value.minBid) || 1;
+          aucTopic.value = (hl.value && hl.value.topics && hl.value.topics[0] && hl.value.topics[0].id) || '';
+        }
+      });
+      const doAuctionBid = () => {
+        const t = ((hl.value && hl.value.topics) || []).find(x => x.id === aucTopic.value);
+        if (!t) { window.Store.toast('先选一个头条话题', 'warn'); return; }
+        const amt = Number(aucAmount.value);
+        if (!Number.isInteger(amt) || amt < aucFloor.value) { window.Store.toast('出价需为整数且至少 ' + aucFloor.value + 'AP（当前最高 + ' + minStep.value + ' 步进）', 'warn'); return; }
+        if (amt > S.ap) { window.Store.toast('行动点不足（出价=行动点，当前 ' + S.ap + 'AP）', 'warn'); return; }
+        window.Store.send('skill', { kind: 'bid_headline', topic: t.title, amount: amt, ap: amt });
+      };
+      const doBidPass = () => window.Store.send('skill', { kind: 'bid_pass', ap: 0 });
+      const aucDone = () => { aucOver.value = true; };
 
       const locked = computed(() => (S.act || 1) < 2 && !S.demo);
       const opsOpen = computed(() => S.act >= 3 || !!S.demo);
@@ -170,6 +198,7 @@
 
       return { S, M, refutePost, buyOpen, buyTitle, shownPosts, ownedKcs, officialHot, hotBusy, hotNotice, loadOfficialHot, match, openRefute, doRefute, doBuy,
                heatLabel, signalRows, postSignals, refuted, bidAmount, hl, doBid, locked, page, pageCount, pagePosts, prevPage, nextPage,
+               auctionLive, aucTopic, aucAmount, aucOver, aucFloor, minStep, bidName, doAuctionBid, doBidPass, aucDone,
                closeBoard, stars, no, isBought, suspects, cur, lastDm, send, chatText, kw, doSearch, kwPool,
                cocoonActive, cocoonSuppressed, breakCocoon, playerCharId, selectTarget,
                opsOpen, selPost, targetPost, pickPost, fakeClues, flood, report, plantFake, inspectHeat };
@@ -294,10 +323,34 @@
           </div>
           <div class="hf-progress" v-if="!S.demo">
             <b>争取头条</b>
-            <p class="dim">{{ targetPost ? targetPost.title : '先选择一条热搜' }}</p>
-            <label>投入行动点 <input v-model.number="bidAmount" type="number" min="1" :max="Math.min(12, S.ap)" aria-label="头条出价行动点"></label>
-            <button class="btn primary" @click="doBid" :disabled="!opsOpen || S.busy || S.isSpectator || !targetPost || !Number.isInteger(bidAmount) || bidAmount < 1 || bidAmount > Math.min(12, S.ap)">提交出价</button>
-            <p class="dim">{{ opsOpen ? '当前为单次出价即时结算；置顶不代表内容真实。' : '第三幕解锁' }}</p>
+            <template v-if="auctionLive">
+              <div class="hl-auction">
+                <header class="hl-auc-hd">
+                  <countdown-ring :key="hl.windowId" :seconds="hl.deadlineIn || 60" :running="true" label="竞价窗口"></countdown-ring>
+                  <span class="hl-auc-top" v-if="hl.top">当前最高：<b>{{ bidName(hl.top) }}</b> · {{ hl.topAmount }}AP</span>
+                  <span class="hl-auc-top dim" v-else>暂无人出价 · 底价 {{ hl.minBid }}AP</span>
+                </header>
+                <div class="hl-auc-topics">
+                  <button v-for="t in hl.topics" :key="t.id" class="hf-side-item" type="button"
+                          :class="{ sel: aucTopic === t.id }" @click="aucTopic = t.id" :title="t.title">{{ t.title }}</button>
+                </div>
+                <label class="hl-auc-amt">出价（步进 {{ minStep }}AP，至少 {{ aucFloor }}AP）
+                  <input v-model.number="aucAmount" type="number" :min="aucFloor" :step="minStep" :max="Math.min(12, S.ap)" aria-label="头条竞价出价（行动点）">
+                </label>
+                <div class="hl-auc-btns">
+                  <button class="btn primary" @click="doAuctionBid" :disabled="aucOver || S.busy || S.isSpectator || S.ap < aucFloor">出价</button>
+                  <button class="btn ghost" @click="doBidPass" :disabled="S.busy || S.isSpectator">弃拍</button>
+                </div>
+                <p class="dim" v-if="aucOver">竞价窗口已关，等待结算…</p>
+                <p class="dim" v-else>出价=行动点 · 被反超可加价或弃拍 · 流拍时头条位空置。</p>
+              </div>
+            </template>
+            <template v-else>
+              <p class="dim">{{ targetPost ? targetPost.title : '先选择一条热搜' }}</p>
+              <label>投入行动点 <input v-model.number="bidAmount" type="number" min="1" :max="Math.min(12, S.ap)" aria-label="头条出价行动点"></label>
+              <button class="btn primary" @click="doBid" :disabled="!opsOpen || S.busy || S.isSpectator || !targetPost || !Number.isInteger(bidAmount) || bidAmount < 1 || bidAmount > Math.min(12, S.ap)">提交出价</button>
+              <p class="dim">{{ opsOpen ? '当前为单次出价即时结算；置顶不代表内容真实。' : '第三幕解锁' }}</p>
+            </template>
             <p v-if="hl && hl.settled" role="status">{{ hl.result || '本轮头条已结算' }}{{ hl.cost ? ' 消耗 ' + hl.cost + ' AP。' : '' }}</p>
           </div>
           <div class="hf-progress">
