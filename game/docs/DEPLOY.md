@@ -61,16 +61,27 @@ chmod 600 game/.env
 scp game/.env root@<服务器IP>:/opt/kanshan-mystery-night/game/.env
 ```
 
-### 4. 起容器
+### 4. 起容器（docker compose 一键部署，推荐）
+```bash
+cd game
+docker compose up -d --build
+# 验证
+docker compose ps                        # STATUS 应为 Up (healthy)，约 15s 后健康检查转绿
+curl http://127.0.0.1:8899/api/health    # 期望 {"status":"ok",...,"engine":{"available":true}}
+docker compose logs -f kanshan           # 实时日志排查
+```
+挂载说明（见 `game/docker-compose.yml`）：`./volumes/data → /app/data` 存对局存档（`data/sessions`、`data/memory`），
+`./volumes/cache → /app/agents/cache` 存 LLM 缓存与额度统计 —— 都挂出来，容器重建不丢。
+
+⚠️ 硬约束：rooms + EngineDriver 全在进程内存 → **单实例运行，严禁 `--scale` / 多副本**。
+⚠️ 端口只绑 `127.0.0.1`，对外统一走 Nginx 反代（安全组不要开 8899）。
+
+备选（不装 compose 插件时，用裸 docker run）：
 ```bash
 docker build -t kanshan ./game
 docker run -d --name kanshan --restart always -p 127.0.0.1:8899:8899 \
   -v /data/kanshan:/app/data -v /data/kanshan-cache:/app/agents/cache kanshan
-# 验证
-curl http://127.0.0.1:8899/api/health   # 期望 {"status":"ok",...,"engine":{"available":true}}
 ```
-挂载说明：`/app/data` 存对局存档（`data/sessions`、`data/memory`），
-`/app/agents/cache` 存 LLM 缓存与额度统计 —— 都挂出来，容器重建不丢。
 
 ### 5. Nginx 反代（**WS 升级头是必须的，漏了直接 400**）
 ```nginx
@@ -99,9 +110,7 @@ certbot --nginx -d <你的域名>        # 免费证书，自动改写 Nginx
 
 ### 7. 更新流程
 ```bash
-git pull && docker build -t kanshan ./game && \
-docker rm -f kanshan && docker run -d --name kanshan --restart always \
-  -p 127.0.0.1:8899:8899 -v /data/kanshan:/app/data -v /data/kanshan-cache:/app/agents/cache kanshan
+cd game && git pull && docker compose up -d --build
 ```
 
 ## 四、必须配置的环境变量

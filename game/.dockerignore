@@ -13,3 +13,5 @@ agents/cache/
 # 本地日志与临时产物
 *.log
 *.mp4
+# 白名单：游戏视频资产是内容本体，缺了前端会降级（同 .gitignore 79c4206 的坑）
+!content/assets/videos/*.mp4

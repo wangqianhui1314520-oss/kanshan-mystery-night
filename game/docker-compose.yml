@@ -1,0 +1,26 @@
+# 《求真档案局·看山失踪夜》容器化一键部署
+# 用法：cd game && cp .env.example .env && vi .env && chmod 600 .env && docker compose up -d --build
+# 验证：curl http://127.0.0.1:8899/api/health   （期望 {"status":"ok",...,"engine":{"available":true}}）
+#
+# ⚠️ 硬约束：rooms + EngineDriver 全在进程内存 → 单实例运行，严禁 --scale / 多副本。
+# ⚠️ 端口只绑 127.0.0.1，对外统一走 Nginx 反代（WS 升级头必配，见 docs/DEPLOY.md 第 5 节）。
+services:
+  kanshan:
+    build: .
+    image: kanshan:latest
+    container_name: kanshan
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: "8899"
+    ports:
+      - "127.0.0.1:8899:8899"
+    volumes:
+      - ./volumes/data:/app/data            # 对局存档（data/sessions、data/memory），容器重建不丢
+      - ./volumes/cache:/app/agents/cache   # LLM 磁盘缓存与额度统计
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8899/api/health', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
