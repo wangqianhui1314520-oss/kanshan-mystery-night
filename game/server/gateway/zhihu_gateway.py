@@ -77,7 +77,10 @@ class ZhihuGateway:
         self.user_base = os.environ.get(
             "ZHIHU_GAME_USER_API_BASE", "https://openapi.zhihu.com").rstrip("/")
         self.timeout = float(os.environ.get("ZHIHU_GAME_HTTP_TIMEOUT", "10"))
-        self.throttle_s = float(os.environ.get("ZHIHU_GAME_THROTTLE_SECONDS", "1"))
+        # 比赛模式：知乎直答对话取消本地节流（默认 0 = 连续多次调用零等待）。
+        # 若显式配置 ZHIHU_GAME_THROTTLE_SECONDS > 0，节流窗口内的调用会
+        # 「等待窗口结束后继续」，不再直接拒绝——频率限制不中断对话流程。
+        self.throttle_s = float(os.environ.get("ZHIHU_GAME_THROTTLE_SECONDS", "0"))
         self.limits = {
             # 本地保护上限可配置；官方额度以 live_quota 为准。默认 20 次，
             # 避免测试/多人对局被过低的演示值 2 次直接阻断。
@@ -214,13 +217,14 @@ class ZhihuGateway:
         if extra_headers:
             headers = {**headers, **extra_headers}
         async with self._net_lock:
-            now = time.monotonic()
-            last = self._last_live_call.get(kind)
-            if last is not None and now - last < self.throttle_s:
-                raise GatewayError(
-                    "throttled",
-                    f"节流窗口内（{self.throttle_s:.0f}s）——本次未调用真实 API、未消耗额度")
-            self._last_live_call[kind] = now
+            # 节流改为等待型（不拒绝）：若配置了 throttle_s > 0，窗口内的调用
+            # 等待至窗口结束再发起真实 API 调用，对话流程不中断。默认 0 = 无节流。
+            if self.throttle_s > 0:
+                now = time.monotonic()
+                last = self._last_live_call.get(kind)
+                if last is not None and now - last < self.throttle_s:
+                    await asyncio.sleep(self.throttle_s - (now - last))
+            self._last_live_call[kind] = time.monotonic()
             client = self._get_client()
             try:
                 resp = await client.request(method, url, params=params,
@@ -483,18 +487,25 @@ class ZhihuGateway:
         self._last_live_call["chat"] = time.monotonic()
         messages = ([{"role": "system", "content": system}] if system else [])
         messages.append({"role": "user", "content": user})
-        try:
-            with httpx.Client(timeout=self.timeout) as client:
-                resp = client.post(
-                    f"{self.open_base}/v1/chat/completions",
-                    json={"model": _OPENAI_MODEL_DEFAULT, "messages": messages,
-                          "stream": False},
-                    headers=self._auth_headers())
-        except httpx.HTTPError as e:
-            self._record("chat", f"网络请求失败：{type(e).__name__}")
-            return self._fallback(user)
-        if resp.status_code != 200:
-            self._record("chat", f"HTTP {resp.status_code}")
+        resp = None
+        for attempt in range(4):
+            try:
+                with httpx.Client(timeout=self.timeout) as client:
+                    resp = client.post(
+                        f"{self.open_base}/v1/chat/completions",
+                        json={"model": _OPENAI_MODEL_DEFAULT, "messages": messages,
+                              "stream": False},
+                        headers=self._auth_headers())
+            except httpx.HTTPError as e:
+                self._record("chat", f"网络请求失败：{type(e).__name__}")
+                return self._fallback(user)
+            if resp.status_code == 429 and attempt < 3:
+                # 官方限流快速退避自动重试，不中断对话流程
+                time.sleep((0.8, 1.6, 3.0)[attempt])
+                continue
+            break
+        if resp is None or resp.status_code != 200:
+            self._record("chat", f"HTTP {getattr(resp, 'status_code', 'n/a')}")
             return self._fallback(user)
         try:
             data = resp.json()

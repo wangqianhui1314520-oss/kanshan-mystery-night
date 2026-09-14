@@ -34,9 +34,20 @@ def test_player_chat_replies_and_persists_without_ui_key():
             events, error = asyncio.run(server.run_action('chat_test', 'chat', 'player:1', {'target': target, 'text': '你好'}))
             assert error is None
             replies = [e for e in events if e['type'] == 'chat' and e['payload'].get('source') == 'agent']
-            assert len(replies) == 1
-            assert replies[0]['payload']['char_id'] == target
-            assert replies[0] in server.store.load_session('chat_test')['events']
+            if target == 'dm':
+                # V3.2 → 比赛模式契约演进：对 DM/全场广播 → DM 回应之外，自动
+                # 社交回应全员串联接话（run_chat_respond，一席一句按序调用）。
+                # chat_test 未设 booklet_roles → 8 席全部为 AI 空席。
+                dm_reply = [e for e in replies if e['payload'].get('char_id') == 'dm']
+                npc_replies = [e for e in replies if e['payload'].get('char_id') != 'dm']
+                assert len(dm_reply) == 1
+                assert len(npc_replies) == 8
+                assert all(e['payload'].get('wave') for e in npc_replies)
+            else:
+                # 定向对具体 NPC：保持引擎定向回应契约，恰好 1 条
+                assert len(replies) == 1
+                assert replies[0]['payload']['char_id'] == target
+            assert all(e in server.store.load_session('chat_test')['events'] for e in replies)
             assert not any(e['payload'].get('event') == 'npc_pending' for e in events)
 
     with patch.object(server, '_llm_for_session', return_value=None), patch.object(server, 'run_ai_wave', no_wave):

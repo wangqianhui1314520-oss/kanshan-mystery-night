@@ -34,3 +34,4 @@ zhihu-cli-skill.zip
 # WorkBuddy 内部目录（记忆/密钥/缓存，绝不进仓库）
 .workbuddy/
 .playwright-cli/
+data_remote_files.txt

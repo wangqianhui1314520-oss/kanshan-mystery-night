@@ -78,13 +78,15 @@ class _StubGateway:
 
 
 def _disable_ai_wave(monkeypatch):
-    """隔离空席 wave（它也会用同一 gateway，污染调用计数）。"""
+    """隔离空席 wave 与真人广播后的自动社交回应（比赛模式全员 8 席接话，
+    同样会用同一 gateway，污染 DM 泄露重试的调用计数）。"""
     import server.main as main_mod
 
     async def _no_wave(self, session_id):
         return []
 
     monkeypatch.setattr(main_mod.GameServer, "run_ai_wave", _no_wave)
+    monkeypatch.setattr(main_mod.GameServer, "run_chat_respond", _no_wave)
 
 
 def test_dm_reply_leak_is_retried_then_replaced(tmp_path, monkeypatch):

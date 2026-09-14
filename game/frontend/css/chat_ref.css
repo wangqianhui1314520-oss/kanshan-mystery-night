@@ -115,6 +115,13 @@
 .api-grid{display:flex;flex-direction:column;gap:6px}
 .api-grid label{font-size:11px;color:#85B7EB;display:flex;flex-direction:column;gap:3px}
 .api-grid input{background:#101a30;border:1px solid rgba(78,143,244,.4);border-radius:6px;color:#fff;padding:6px 8px}
-.help-body p{margin:6px 0;font-size:12px;color:#B5D4F4;line-height:1.7}
+.help-body p{margin:6px 0 0;font-size:12px;color:#B5D4F4;line-height:1.7}
 .help-body b{color:#fff}
 @media(max-width:640px){.ach-wall{grid-template-columns:repeat(2,1fr)}}
+
+/* 微信式"正在发言中"typing 气泡（AI 按席位顺序发言占位） */
+.cs-bubble.typing{border-style:dashed;color:#8FA8CF}
+.typing-dots i{display:inline-block;width:5px;height:5px;margin:0 2px;border-radius:50%;background:#4E8FF4;animation:cs-typing 1.1s infinite}
+.typing-dots i:nth-child(2){animation-delay:.18s}
+.typing-dots i:nth-child(3){animation-delay:.36s}
+@keyframes cs-typing{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}

@@ -1,6 +1,7 @@
 """NPC social routes: isolated private context and seat-aware public speech."""
 import asyncio
 import copy
+import re
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -11,7 +12,42 @@ from .reply_guard import RETRY_HINT, has_product_identity
 from .safety import check_text
 
 
-async def social_request(server, session_id, body, *, private=False):
+def infer_social_phase(session: dict, stage: str) -> str:
+    """从最近 DM 引导文本推断社交 phase，让 AI 跟随 DM 引导行动。
+
+    - DM 说"自我介绍/介绍自己" → intro（AI 轮流介绍）
+    - DM 说"读本/剧本/证词" → testimony（AI 轮流陈述当晚经历）
+    - DM 说"自由讨论/搜证" 或阶段已过破冰 → 空（自由讨论回应模式）
+    只读事件流，不改任何状态，供真人发言后的回应路径使用。
+    """
+    for ev in reversed((session.get("events") or [])[-40:]):
+        if str(ev.get("actor") or "") != "dm":
+            continue
+        payload = ev.get("payload") or {}
+        text = str(payload.get("text") or payload.get("summary") or "")
+        if not text:
+            continue
+        if ("自由讨论" in text or "搜证" in text or "开始讨论" in text):
+            return ""
+        if "读本" in text or "剧本" in text or "证词" in text:
+            return "testimony"
+        if "介绍" in text:
+            return "intro"
+        break
+    # 无 DM 引导证据时回落讨论回应模式：全员轮流介绍只由显式 phase=intro
+    # （前端破冰入口 / DM 面板按钮）触发，避免每条真人发言都整桌刷屏。
+    return ""
+
+
+async def social_request(server, session_id, body, *, private=False,
+                         max_roles: int = 0):
+    """公开社交波：真人一句话触发后，全体空席 AI 按席位顺序「串联逐个」回复。
+
+    每席独立调用一次 API（一席一句），后手 AI 的上下文包含玩家原话与
+    前面全部 AI 的回复，保证衔接连贯；每个 AI 可选择保持沉默
+    （回复【沉默】标记时不产出消息）。max_roles 保留参数兼容旧调用，
+    但默认 0 = 不限波次，一次请求全员依次回复完毕（知乎直答比赛模式
+    已取消本地 QPS 限流，见 llm_client / zhihu_gateway 同步改动）。"""
     if not isinstance(body, dict):
         raise HTTPException(400, "请求体必须是 JSON 对象")
     sender = str(body.get("from") or body.get("player_id") or "player:1")
@@ -50,10 +86,43 @@ async def social_request(server, session_id, body, *, private=False):
         rt.sync_booklets(chapter)
         stage = session.get("stage", "break_ice")
         phase = str(body.get("phase") or "").strip()
+        # 未显式指定 phase 时跟随 DM 引导：真人发言后的回应路径不传 phase，
+        # 由 DM 最近引导文本决定 AI 该"轮流介绍"还是"自由讨论回应"。
+        if not phase and not private:
+            phase = infer_social_phase(session, stage)
+        # max_roles 解析：body 显式 > 签名默认。0 = 不限波次——一次请求全员
+        # 按席位顺序串联回复完毕（比赛模式已取消本地 QPS 限流：llm_client
+        # 取消强制间隔、zhihu_gateway 节流改为等待，官方 429 由退避重试兜住，
+        # 不再需要分波规避）。仅当 body 显式传正整数时才截断席位（旧调用兼容）。
+        if body.get("max_roles") is not None:
+            max_roles = int(body.get("max_roles") or 0)
+        else:
+            max_roles = int(max_roles or 0)
+        # 自动回应（真人公开发言后）：同样全员一轮串联回复；DM 引导环节
+        # （intro/testimony）轮过一轮后回落自由讨论回应模式，不重复介绍。
+        auto_respond = bool(body.get("respond_trigger")) and not private
+        if auto_respond:
+            done = set(session.get("social_phases_done") or [])
+            if phase in ("intro", "testimony") and phase not in done:
+                pass                     # 引导轮：全员轮流跟随
+            else:
+                phase = ""               # 引导已轮过 / 自由讨论：回应模式
+        # 全员串联回复：严格按席位池顺序（vacant_ai_roles 返回序）逐个调用，
+        # 不再轮转截断/分波（比赛模式已取消本地 QPS 限流，官方 429 由退避
+        # 重试兜住）。served_map/track_key 保留用于引导轮 covered 记账与
+        # remaining 汇报；social_wave_cursor 历史字段不再使用。
+        served_map = session.setdefault("social_served", {})
+        vacant_at_start = len(roles)
+        track_key = phase if phase in ("intro", "testimony") else (
+            "reply" if auto_respond else "free")
+        if body.get("max_roles") is None or int(body.get("max_roles") or 0) <= 0:
+            take = len(roles)            # 默认：全员一轮
+        else:
+            take = min(int(body["max_roles"]), len(roles))  # 旧调用显式截断兼容
         prompts = {
             "break_ice": "按公开身份简短自我介绍，不透露秘密。",
-            "investigate": "围绕已知口供说一个调查方向，不虚构发现的证据。",
-            "round_table": "围绕公开讨论表态并提出一个待核实的问题。",
+            "investigate": "针对刚才玩家们的公开发言做出回应：可直接回答、提出追问、表达质疑，或补充你视角的信息；不虚构发现的证据。",
+            "round_table": "针对刚才玩家们的公开发言表态：赞同就给出理由，怀疑就抛出待核实的质问；不替引擎宣布结局。",
             "accuse": "发表最后立场，不替引擎宣布结局，不提示隐藏指认目标。",
         }
         # 模板只在请求未携带原文时兜底：玩家私聊原文/主持人显式指令永远优先。
@@ -81,6 +150,11 @@ async def social_request(server, session_id, body, *, private=False):
                         if line][-8:]
         events, failures = [], []
         last_error = ""
+        # 玩家刚发言的原文（public_lines 里 player: 开头的最后一条），
+        # 供 context 强调"正面回应"，让 AI 围绕聊天内容沟通而非自说自话。
+        last_human_line = next(
+            (ln for ln in reversed(public_lines)
+             if ln.split("：", 1)[0].startswith("player:")), "")
         for cid in roles:
             if cid not in rt.npcs:
                 continue
@@ -98,8 +172,15 @@ async def social_request(server, session_id, body, *, private=False):
                        "绝对不要介绍自己是知乎直答、AI、模型或产品；不要输出产品宣传语。"
                        "用第一人称自然口语，结合你的角色经历、说话习惯和已解锁记忆回答。"
                        "回复必须包含与本角色经历或当前现场相关的具体内容，不能使用通用客服话术。"
-                       "当前阶段：" + stage + "。只引用已知信息；公开讨论：\n" + "\n".join(public_lines)
+                       "当前阶段：" + stage + "。只引用已知信息；公开讨论最近发言：\n" + "\n".join(public_lines)
                        + ("\n（下面这句话是玩家私聊原话）" if private else "\n（下面这句话是主持人的邀请原文）"))
+            if not private and last_human_line:
+                context += ("\n（最近一条真人玩家发言：" + last_human_line
+                            + " ——请优先正面回应它：回答、反问、质疑，或结合你的经历补充；不要复读别人说过的话。）")
+            if not private:
+                context += ("\n（你可以选择是否发言：若有值得说的话请给出实质回复；"
+                            "若此刻你的角色确实无需表态、插话会显得刻意，就只回复【沉默】两个字，"
+                            "表示保持安静。除【沉默】外不要输出任何旁白或说明。）")
             try:
                 reply = await asyncio.to_thread(npc.respond, prompt, trust=0, context=context)
                 provider = getattr(llm, "last_provider", "")
@@ -126,6 +207,13 @@ async def social_request(server, session_id, body, *, private=False):
                 last_error = str(exc)[:180]
                 failures.append(cid)
                 continue
+            # 选择性回复：AI 声明保持沉默（只回【沉默】标记）时，本席不产出
+            # 任何消息（不出现在聊天流），短期记忆保留「（沉默）」——它记得
+            # 自己这轮没说话；随后轮到下一席继续。
+            if not private and re.fullmatch(r"[（(【\s]*沉默[）)】\s]*", reply.strip()):
+                npc.memory["short_term"][-1]["npc"] = "（沉默）"
+                rt.npcs[cid].memory = npc.memory
+                continue
             npc.memory["short_term"][-1]["npc"] = reply
             if private:
                 private_memory[memory_key] = npc.memory
@@ -145,17 +233,35 @@ async def social_request(server, session_id, body, *, private=False):
             events.append(event("npc:" + cid, payload))
             if not private:
                 public_lines = (public_lines + [reply])[-8:]
+                # 上下文串联：本席回复立即进入公开最近发言，下一席 AI 的
+                # prompt 会带上它（逐席衔接、连贯自然）；节流已按比赛模式
+                # 取消，连续调用由 llm_client/gateway 的等待型限流兜底。
+                # 逐席实时广播：玩家即时看到「AI 一句接一句」的串联节奏，
+                # 无需等全员生成完毕才齐刷上屏（HTTP 响应仍带全量 events，
+                # 前端按 message_id 去重，不会重复上屏）。
+                await server.broadcast(session_id, [events[-1]])
         if not events and failures:
             detail = "AI 接口未能返回回复，请检查 API 配置与额度后重试"
             if last_error:
                 detail += "；诊断：" + last_error
             raise HTTPException(503, detail)
+        # 按实际发言数回写该用途的已服务席位（respond 失败不计），并据此前推
+        # 引导轮是否覆盖满一轮空席（covered → social_phases_done）。
+        if not private and events:
+            spoke = sum(1 for e in events
+                        if e.get("type") == "chat" and str(e.get("actor") or "").startswith("npc:"))
+            served_map[track_key] = int(served_map.get(track_key) or 0) + spoke
+            if auto_respond and phase in ("intro", "testimony") \
+                    and served_map.get(track_key, 0) >= vacant_at_start:
+                done = set(session.get("social_phases_done") or [])
+                done.add(phase)
+                session["social_phases_done"] = sorted(done)
         session.setdefault("events", []).extend(events)
         server.store.save_session(session_id, session)
     if private:
         await server.broadcast_to(session_id, [sender], events)
-    else:
-        await server.broadcast(session_id, events)
+    # 公开路径已逐席实时广播，无需整批重发（前端按 message_id 去重双保险）。
     return {"ok": True, "count": sum(e["payload"].get("actor_kind") == "npc" for e in events),
+            "remaining": max(0, vacant_at_start - int(served_map.get(track_key) or 0)) if not private else 0,
             "events": events, "failed_roles": failures,
             "event": events[-1] if private and events else None}

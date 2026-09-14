@@ -140,13 +140,16 @@ def vacant_ai_roles(session: dict) -> list[str]:
 
 
 def take_wave_roles(session: dict, n: int | None = None) -> list[str]:
-    """本波出手的空席。n 为空或 <=0 时整桌空席各走一步（像真人围坐一轮）。"""
+    """本波出手的空席。比赛模式已取消本地 QPS 限流（llm_client /
+    zhihu_gateway / npc_social 同步改动），n 为空或 <=0 时**全员出手**——
+    空席 AI 按轮转顺序逐席行动/发言（每席独立调用，串联衔接）。显式传 n
+    仍可截断（旧调用兼容）。"""
     vacant = vacant_ai_roles(session)
     cursor = int(session.get("ai_wave_cursor") or 0)
     if n is None or int(n) <= 0:
         take_n = len(vacant)
     else:
-        take_n = int(n)
+        take_n = max(0, min(int(n), len(vacant)))
     try:
         from agents.seat_runner import rotate_roles
         picked, nxt = rotate_roles(vacant, cursor, take_n)

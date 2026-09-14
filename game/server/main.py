@@ -665,7 +665,7 @@ class GameServer:
                             + json.dumps({"stage": session.get("stage"),
                                           "actions_left": session.get("actions_left"),
                                           "player_text": payload.get("text", "")}, ensure_ascii=False),
-                            provider="zhida")
+                            provider="main")
                     elif tgt in rt.npcs:
                         dv = eng.ms.current_version(tgt)
                         while rt.memory.current_version(tgt) < dv:
@@ -681,7 +681,32 @@ class GameServer:
                         failure = "请选择一位在场角色再对话。"
                     provider = getattr(llm, "last_provider", "")
                     if getattr(llm, "last_error", "") or provider in ("mock", "fallback"):
-                        failure = "AI 接口暂时未能返回回复，请稍后重试或检查 API 配置与额度。"
+                        # 瞬时限流（429 退避后仍失败）：2.5s 后静默重试一次，玩家无感
+                        time.sleep(2.5)
+                        try:
+                            if is_dm:
+                                reply = call_gateway(llm, rt.dm._persona_system(),
+                                    "请以主持人口吻简短回应玩家，只参考当前公开状态，不透露隐藏答案。\n"
+                                    + json.dumps({"stage": session.get("stage"),
+                                                  "actions_left": session.get("actions_left"),
+                                                  "player_text": payload.get("text", "")}, ensure_ascii=False),
+                                    provider="main")
+                            elif tgt in rt.npcs:
+                                npc = rt.npcs[tgt]
+                                previous = npc.gateway
+                                npc.gateway = llm
+                                try:
+                                    reply = rt.npc_chat(tgt, payload.get("text", "")).get("reply")
+                                finally:
+                                    npc.gateway = previous
+                            provider = getattr(llm, "last_provider", "")
+                        except Exception:
+                            pass
+                    if getattr(llm, "last_error", "") or provider in ("mock", "fallback"):
+                        why = (llm.degrade_log[-1] if getattr(llm, "degrade_log", None)
+                               else "") or "上游暂不可用"
+                        failure = (f"AI 接口暂时未能返回回复（{why[:90]}）。"
+                                   "多为知乎直答限流，等 10 秒再试即可。")
                     elif not reply:
                         failure = failure or "AI 未返回有效回复，请重试。"
             except Exception:
@@ -770,17 +795,62 @@ class GameServer:
 
     async def _with_ai_wave(self, session_id: str, events: list[dict],
                             allow_ai: bool) -> tuple[list[dict], None]:
-        """真人动作后补空席 AI；allow_ai=True（run_ai_act 内部）不再 wave，防递归。"""
+        """真人动作后补空席 AI；allow_ai=True（run_ai_act 内部）不再 wave，防递归。
+
+        真人「公开聊天」走社交回应路径（AI 针对聊天内容回答/追问/质疑，
+        并跟随 DM 引导轮流介绍/陈述证词）；其余动作（搜证/技能/投票）保持
+        自走棋 wave（PlayerAgent 按闭卷决策）。
+        """
         if allow_ai or getattr(self, "_ai_waving", False):
             return events, None
         self._ai_waving = True
         try:
-            extra = await self.run_ai_wave(session_id)
+            # 全场广播式发言（无 target 或对 DM）才触发社交回应；对具体 NPC 的
+            # 定向发言已有引擎内定向回应链路（npc_pending→npc_chat），不重复。
+            # 引擎会把 target 规范化为 npc: 前缀（dm→npc:dm），统一剥离后比较。
+            has_human_broadcast_chat = any(
+                e.get("type") == "chat"
+                and not (e.get("payload") or {}).get("whisper")
+                and not (e.get("payload") or {}).get("team")
+                and str((e.get("payload") or {}).get("target") or "").removeprefix("npc:") in ("", "dm")
+                and str(e.get("actor") or "").startswith("player:")
+                and not str(e.get("actor") or "").startswith("player:ai:")
+                for e in events)
+            extra = (await self.run_chat_respond(session_id)
+                     if has_human_broadcast_chat
+                     else await self.run_ai_wave(session_id))
         finally:
             self._ai_waving = False
         if extra:
             events = events + extra
         return events, None
+
+    async def run_chat_respond(self, session_id: str) -> list[dict]:
+        """真人公开发言后的 AI 社交回应：走 npc_social 公开波（带最近聊天
+        上下文 + DM 引导 phase 推断）。LLM 未配置或全部失败时回退自走棋
+        wave，保持旧行为，零副作用。"""
+        if self.store is None:
+            return []
+        session = self.store.load_session(session_id)
+        if session is None or session.get("status") != "playing":
+            return []
+        if session.get("engine", "mock") == "mock" or self._llm_for_session(session_id) is None:
+            return await self.run_ai_wave(session_id)
+        sender = "player:1"
+        for ev in reversed(session.get("events") or []):
+            if ev.get("type") != "chat":
+                continue
+            actor0 = str(ev.get("actor") or "")
+            if actor0.startswith("player:") and not actor0.startswith("player:ai:"):
+                sender = actor0
+                break
+        body = {"player_id": sender, "prompt": "", "respond_trigger": True}
+        try:
+            from .npc_social import social_request
+            res = await social_request(self, session_id, body, private=False)
+            return list(res.get("events") or [])
+        except Exception:
+            return await self.run_ai_wave(session_id)
 
     async def run_ai_wave(self, session_id: str) -> list[dict]:
         """空席整桌各行动一步；前端对其中的 AI 台词做轮流播报。"""
@@ -798,10 +868,19 @@ class GameServer:
             if session is None or session.get("status") != "playing": break
             try:
                 preview, err = await self.run_ai_act(session_id, role, dry_run=True)
-                if err is not None or ((preview or {}).get("decision") or {}).get("type") == "advance": continue
-                body, err = await self.run_ai_act(session_id, role, dry_run=False)
+                pre_decision = (preview or {}).get("decision") or {}
+                if err is not None or pre_decision.get("type") == "advance": continue
+                body, err = await self.run_ai_act(
+                    session_id, role, dry_run=False,
+                    prefetched_decision=pre_decision)
                 if err is None and body.get("applied"):
-                    collected.extend(body.get("events") or [])
+                    seat_events = body.get("events") or []
+                    collected.extend(seat_events)
+                    # 逐席实时广播（微信式消息流）：WS 房间立刻收到本席台词，
+                    # 前端 aiSpeechQueue 按席位顺序逐条上屏；handle 丢弃返回值，
+                    # 不会二次广播（HTTP /ai_wave 响应仍带事件，非 WS 前端走那条）。
+                    if seat_events:
+                        await self.broadcast(session_id, seat_events)
             except Exception:
                 continue
         # AI 演出位：小游戏（心声窃听）+ 暗拍/头条，每幕各至多一次，零副作用兜底
@@ -891,8 +970,13 @@ class GameServer:
         return events
 
     async def run_ai_act(self, session_id: str, char_id: str,
-                         dry_run: bool = False) -> tuple[dict, dict | None]:
-        """按该角色已开封的闭卷提议并（可选）执行一步。"""
+                         dry_run: bool = False,
+                         prefetched_decision: dict | None = None
+                         ) -> tuple[dict, dict | None]:
+        """按该角色已开封的闭卷提议并（可选）执行一步。
+
+        prefetched_decision：预检（dry_run）阶段已拿到的决策——直接复用，
+        省掉执行阶段的第二次 LLM 调用（知乎直答有 QPS 限流，AI 波减半）。"""
         session = self.store.load_session(session_id)
         if session is None:
             return {}, {"status": 404, "notice": f"对局不存在：{session_id}"}
@@ -947,14 +1031,19 @@ class GameServer:
         decision_started = time.perf_counter()
         # decide 内部为同步 LLM 调用（LLM_TIMEOUT=30s + 429 退避最多 ~24s），
         # 必须放线程池执行，否则阻塞事件循环冻结全服务心跳（与 npc_social 同法）。
-        decision = await asyncio.to_thread(agent.decide, role, stage=stage,
-                                           legal=allowed, state=state,
-                                           use_llm=gateway is not None)
-        decision["meta"] = {
-            "legal": list(allowed),
-            "provider": getattr(gateway, "last_provider", "heuristic") if gateway else "heuristic",
-            "latency_ms": round((time.perf_counter() - decision_started) * 1000, 1),
-        }
+        # 预检（dry_run）已拿到的决策直接复用：AI 波每省一次 LLM 调用（限流减负）。
+        if prefetched_decision:
+            decision = dict(prefetched_decision)
+            decision["meta"] = {"prefetched": True}
+        else:
+            decision = await asyncio.to_thread(agent.decide, role, stage=stage,
+                                               legal=allowed, state=state,
+                                               use_llm=gateway is not None)
+            decision["meta"] = {
+                "legal": list(allowed),
+                "provider": getattr(gateway, "last_provider", "heuristic") if gateway else "heuristic",
+                "latency_ms": round((time.perf_counter() - decision_started) * 1000, 1),
+            }
         act_type = str(decision.get("type") or "chat")
         payload = dict(decision.get("payload") or {})
         # 身份净化：AI 席位台词直接进公共频道，命中产品自曝即换预写台词
@@ -2278,31 +2367,70 @@ async def ai_test(request: Request):
             model = cfg.get("llm_model") or os.environ.get("ZHIHU_LLM_MODEL", "zhida-agent")
             key = key or cfg["zhihu_secret"]
     else:
-        # 页面加载即探测（早于任何对局动作，进程 env 可能尚未初始化）：
-        # 与对局内 AI 同源——走 _llm_for_session 的赛事默认通道（.env 凭证回落），
-        # 避免探针在 env 未初始化时用 mock 兜底误报"AI 调用失败"。
-        probe = game_server._llm_for_session("__ai_test__")
-        if probe is None:
-            raise HTTPException(400, "未配置完整的知乎 Agent 凭证")
-        model = os.environ.get("LLM_MODEL", "zhida-agent")
+        if cfg.get("llm_key") and cfg.get("llm_base") and cfg.get("llm_model"):
+            # 面板三件套（如 DeepSeek 等自建 OpenAI 兼容端点）：用面板凭证
+            # 构造临时实例探针，不写进程 env（避免污染其他对局的回落通道）。
+            from agents.llm_client import LLMClient as _LC, OpenAICompatProvider as _OP
+            _p = _OP()
+            _p.api_key = cfg["llm_key"]
+            _p.base_url = cfg["llm_base"].rstrip("/")
+            _p.model = cfg["llm_model"]
+            try:
+                _p.timeout = float(os.environ.get("LLM_TIMEOUT") or 60)
+            except ValueError:
+                _p.timeout = 60.0
+            probe = _LC(providers={"main": _p, "mock": _LC().providers["mock"]})
+            model = cfg["llm_model"]
+        else:
+            # 页面加载即探测（早于任何对局动作，进程 env 可能尚未初始化）：
+            # 与对局内 AI 同源——走 _llm_for_session 的赛事默认通道（.env 凭证回落），
+            # 避免探针在 env 未初始化时用 mock 兜底误报"AI 调用失败"。
+            probe = game_server._llm_for_session("__ai_test__")
+            if probe is None:
+                raise HTTPException(400, "未配置完整的知乎 Agent 凭证")
+            model = os.environ.get("LLM_MODEL", "zhida-agent")
     if cfg.get("zhihu_secret"):
-        os.environ.update(LLM_API_KEY=key, LLM_BASE_URL=base.rstrip("/"), LLM_MODEL=model,
-                          ZHIHU_ACCESS_SECRET=cfg.get("zhihu_secret", ""))
+        os.environ.update(LLM_API_KEY=key, LLM_BASE_URL=base.rstrip("/"), LLM_MODEL=model)
     try:
         from agents.llm_client import call_gateway
         started = time.monotonic()
+        panel_used = bool(cfg.get("zhihu_secret") or cfg.get("llm_key"))
+        panel_err = ""
         # 官方知乎 Agent 走网关 direct_answer，统一认证、额度和错误信封。
         gw = getattr(app.state, "gateway", None)
-        if gw is not None and cfg.get("zhihu_secret"):
-            gw.access_secret = cfg["zhihu_secret"]
-            # 加随机 nonce 并跳过缓存，确保这是一次真实官方网络请求。
-            nonce = uuid.uuid4().hex[:10]
-            result = await gw.direct_answer(f"请只回复：知乎 Agent 已连接。测试编号 {nonce}", "你是知乎 Agent 连通性测试。", bypass_cache=True)
-            if not result.get("ok"):
-                raise RuntimeError(result.get("notice") or "官方 Agent 返回失败")
-            reply = (result.get("data") or {}).get("content", "")
-            provider = "zhida"
-        else:
+        try:
+            if gw is not None and cfg.get("zhihu_secret"):
+                gw.access_secret = cfg["zhihu_secret"]
+                # 加随机 nonce 并跳过缓存，确保这是一次真实官方网络请求。
+                nonce = uuid.uuid4().hex[:10]
+                result = await gw.direct_answer(f"请只回复：知乎 Agent 已连接。测试编号 {nonce}", "你是知乎 Agent 连通性测试。", bypass_cache=True)
+                if not result.get("ok"):
+                    raise RuntimeError(result.get("notice") or "官方 Agent 返回失败")
+                reply = (result.get("data") or {}).get("content", "")
+                provider = "zhida"
+            else:
+                reply = call_gateway(probe, "你是知乎 Agent 连通性测试。", "请只回复：知乎 Agent 已连接。", provider="main", temperature=0)
+                provider = getattr(probe, "last_provider", "main")
+        except HTTPException:
+            raise
+        except Exception as panel_exc:
+            if not panel_used:
+                raise
+            # 面板/设置里保存的凭证失效（过期 key / 误填）→ 自动回落赛事
+            # 默认通道（.env 凭证，与对局内 AI 同源），探针不再因旧凭证 502。
+            panel_err = f"{type(panel_exc).__name__}: {panel_exc}"
+            # 面板探针可能已把失效凭证写进进程 env——先清掉并从 .env 恢复
+            # 真实凭证，再回落赛事默认通道，否则回落也会拿脏 env 再次失败。
+            for k in ("LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "ZHIHU_APP_KEY"):
+                os.environ.pop(k, None)
+            try:
+                from dotenv import load_dotenv
+                load_dotenv(_ENV_FILE, override=True)
+            except Exception:
+                pass
+            probe = game_server._llm_for_session("__ai_test__")
+            if probe is None:
+                raise HTTPException(502, f"面板凭证无效（{panel_err}），且后端未配置默认通道")
             reply = call_gateway(probe, "你是知乎 Agent 连通性测试。", "请只回复：知乎 Agent 已连接。", provider="main", temperature=0)
             provider = getattr(probe, "last_provider", "main")
         elapsed_ms = round((time.monotonic() - started) * 1000)
@@ -2313,7 +2441,10 @@ async def ai_test(request: Request):
         return {"ok": True, "provider": provider, "source": "api", "network_request": True,
                 "model": model, "elapsed_ms": max(1, elapsed_ms),
                 "identity_leak": has_product_identity(reply),
+                "panel_fallback": bool(panel_err), "panel_error": panel_err,
                 "reply": str(reply)[:120]}
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(502, f"知乎 Agent 请求失败：{type(exc).__name__}: {exc}")
 

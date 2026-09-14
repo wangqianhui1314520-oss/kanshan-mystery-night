@@ -72,6 +72,15 @@
         '反诈先锋': '/assets/images/icon_rumor.png'
       };
       const saveApi = () => { localStorage.setItem('kanshan_api', JSON.stringify(apiForm)); window.Store.toast('API 配置已保存——本局空席开打即可调用', 'good'); settings.value = false; };
+      /* 模型切换：选 DeepSeek 系自动切官方兼容端点；切回知乎系恢复默认端点 */
+      const onModelChange = () => {
+        const m = String(apiForm.llmModel || '');
+        if (m.indexOf('deepseek') === 0) {
+          apiForm.llmBase = 'https://api.deepseek.com';
+        } else if (!apiForm.llmBase || apiForm.llmBase.indexOf('deepseek') >= 0) {
+          apiForm.llmBase = 'https://developer.zhihu.com/v1';
+        }
+      };
 
       /* ---- 体验层（UX）：引擎状态 / 连接状态 / 首屏引导 ---- */
       const UX = window.UX;
@@ -94,7 +103,7 @@
         offline: '引擎状态未知（离线）',
         loading: '正在核对引擎…'
       }[eng.probe] || '正在核对引擎…'));
-      const transportSource = computed(() => (S.netKind === 'ws' ? 'WebSocket 实时通道' : S.netKind === 'mock' ? '本地演示（未连服务器）' : S.netKind === 'error' ? '连接失败' : '尚未连接对局'));
+      const transportSource = computed(() => (S.netKind === 'ws' ? 'WebSocket 实时通道' : S.netKind === 'mock' ? '未开局 · 开局后自动连接服务器' : S.netKind === 'error' ? '连接失败' : '尚未连接对局'));
       const connText = computed(() => ({
         reconnecting: '⟳ 正在重连档案局…' + (conn.attempts ? '（第 ' + conn.attempts + ' 次）' : ''),
         offline: '⚠ 实时通道已断开，请重连后确认对局状态'
@@ -611,7 +620,7 @@
       boot();
 
       const L = window.Labels;
-      return { ai, aiSeats, aiDecision, S, M, L, hostOpen, goalOpen, hostAdvance, taskCard, openTaskCard, booted, bootMsg, settings, leaveAsk, settingsAdv, askLeave, confirmLeave, wsUrl, actName, flawN, kcOwned, erN, navGo, dossierOpen, joinCode, copyShare, achOpen, helpOpen, aboutOpen, apiForm, saveApi, ACH_IMG, elevatorDone, Store: window.Store, VIEWS: window.VIEWS, CUT_LINES, CASE_BRIEF, caseBrief, caseTitle, chapter, menuItems, utilityItems, cutLine, playSkin, showHeat, showKcards, showFlaw, showZans, rail, railOn, prog, pacingHint, dmTasks, dmNext, dmAction, doDmAction, dmMini, openDmMini, goNextChapter, eng, conn, connText, engineSource, transportSource, recheckEngine, retryConn, guideOpen, replayGuide, guideDone, cutVidErr, audioMuted, toggleAudio, Voice, voiceOut, voiceIn, voiceAuto, toggleVoiceOut, toggleVoiceIn, toggleVoiceAuto, seatBookChars, seatRolePack, showSeatRoles, seatRoles, soulQuiz, SOUL_QUESTIONS, soulOpen, soulPick, soulRetake, soulSkip, soulResult, soulMatchId, VoiceRTC, rtcLive, rtcListen, rtcJoin, rtcLeave, shelfOpen, shelfState, shelfItems, shelfToggle, loadShelf, shelfPlayable, shelfTime, shelfPlay, roomLife, npcPendingName };
+      return { ai, aiSeats, aiDecision, S, M, L, hostOpen, goalOpen, hostAdvance, taskCard, openTaskCard, booted, bootMsg, settings, leaveAsk, settingsAdv, askLeave, confirmLeave, wsUrl, actName, flawN, kcOwned, erN, navGo, dossierOpen, joinCode, copyShare, achOpen, helpOpen, aboutOpen, apiForm, saveApi, onModelChange, ACH_IMG, elevatorDone, Store: window.Store, VIEWS: window.VIEWS, CUT_LINES, CASE_BRIEF, caseBrief, caseTitle, chapter, menuItems, utilityItems, cutLine, playSkin, showHeat, showKcards, showFlaw, showZans, rail, railOn, prog, pacingHint, dmTasks, dmNext, dmAction, doDmAction, dmMini, openDmMini, goNextChapter, eng, conn, connText, engineSource, transportSource, recheckEngine, retryConn, guideOpen, replayGuide, guideDone, cutVidErr, audioMuted, toggleAudio, Voice, voiceOut, voiceIn, voiceAuto, toggleVoiceOut, toggleVoiceIn, toggleVoiceAuto, seatBookChars, seatRolePack, showSeatRoles, seatRoles, soulQuiz, SOUL_QUESTIONS, soulOpen, soulPick, soulRetake, soulSkip, soulResult, soulMatchId, VoiceRTC, rtcLive, rtcListen, rtcJoin, rtcLeave, shelfOpen, shelfState, shelfItems, shelfToggle, loadShelf, shelfPlayable, shelfTime, shelfPlay, roomLife, npcPendingName };
     },
     template: `
         <!-- 开场覆盖层：封面 → DM 开场 → 领取侦探证（剧本杀标准流程） -->
@@ -1196,10 +1205,16 @@
             <div class="api-grid">
             <label>知乎 API Base<input v-model="apiForm.llmBase" placeholder="https://developer.zhihu.com/v1"></label>
               <label>LLM Key<input v-model="apiForm.llmKey" type="password" placeholder="sk-…（仅存本机）"></label>
-            <label>知乎默认模型<select v-model="apiForm.llmModel">
+            <label>AI 模型<select v-model="apiForm.llmModel" @change="onModelChange">
+              <optgroup label="知乎直答（默认，无需填 Key）">
+              <option value="zhida-agent">zhida-agent · 智能思考（默认）</option>
               <option value="zhida-fast-1p5">zhida-fast-1p5 · 快速回答</option>
               <option value="zhida-thinking-1p5">zhida-thinking-1p5 · 深度思考</option>
-              <option value="zhida-agent">zhida-agent · 智能思考（默认）</option>
+              </optgroup>
+              <optgroup label="DeepSeek（需填 API Key）">
+              <option value="deepseek-v4-flash">deepseek-v4-flash</option>
+              <option value="deepseek-chat">deepseek-chat · V3 兼容</option>
+              </optgroup>
             </select></label>
               <label>知乎 Secret<input v-model="apiForm.zhihuSecret" type="password" placeholder="Access Secret（可选）"></label>
               <button class="btn primary sm" @click="saveApi">保存 API 配置</button>

@@ -31,15 +31,17 @@ CACHE_DIR = Path(os.environ.get("LLM_CACHE_DIR") or (AGENTS_DIR / "cache"))
 
 _ZHIDA_DEFAULT_URL = "https://developer.zhihu.com/v1/chat/completions"
 
-# 知乎直答有 QPS 限流：AI 波整桌顺序调用会瞬间触发 HTTP 429。
-# 模块级最小调用间隔（跨 LLMClient 实例共享）+ 429 退避重试双保险。
+# 比赛模式（2026-09-14）：知乎直答官方无硬性 QPS 限制——取消本地强制最小
+# 调用间隔（默认 0 = 连续多次调用零等待，支持一席一句的串联调用流）；
+# 官方偶发 429 仍保留短退避自动重试，保证频率限制不中断对话流程。
+# 如需恢复本地节流，可设环境变量 LLM_MIN_INTERVAL（秒）。
 _LAST_CALL = {"ts": 0.0}
-_MIN_CALL_INTERVAL = float(os.environ.get("LLM_MIN_INTERVAL", "1.5"))
-_RETRY_DELAYS = (2.0, 4.0, 7.0, 11.0)
+_MIN_CALL_INTERVAL = float(os.environ.get("LLM_MIN_INTERVAL", "0"))
+_RETRY_DELAYS = (0.8, 1.6, 3.0, 5.0)
 
 
 def _post_with_rate_limit(req, timeout: float) -> dict:
-    """统一 POST+JSON：知乎直答 QPS 节流 + 429 退避（main/zhida 两个通道共用）。"""
+    """统一 POST+JSON：本地节流默认关闭；429 快速退避重试（main/zhida 共用）。"""
     for attempt in range(len(_RETRY_DELAYS) + 1):
         gap = time.time() - _LAST_CALL["ts"]
         if gap < _MIN_CALL_INTERVAL:
@@ -52,7 +54,7 @@ def _post_with_rate_limit(req, timeout: float) -> dict:
         except urllib.error.HTTPError as exc:
             _LAST_CALL["ts"] = time.time()
             if exc.code == 429 and attempt < len(_RETRY_DELAYS):
-                # 限流退避：2s→4s→7s→11s，重试期间其余调用被节流间隔挡住
+                # 官方限流退避：0.8s→1.6s→3s→5s 自动重试，对话流程不中断
                 time.sleep(_RETRY_DELAYS[attempt])
                 continue
             raise

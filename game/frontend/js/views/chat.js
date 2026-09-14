@@ -91,6 +91,10 @@
       const send = async () => {
         if (sendingPrivate.value) return;
         const t = input.value.trim(); if (!t) return;
+        /* 串联发言制：AI 依次发言期间你的消息自动排队，说完轮到你（不丢失） */
+        if (window.Store.aiSpeaking && window.Store.aiSpeaking()) {
+          window.Store.toast('大家正在依次发言，你的消息已排在后面', 'ok');
+        }
         if ((whisperOn.value || chatMode.value === 'private') && canWhisper.value) {
           if (!whisperTo.value) { window.Store.toast('先选私聊对象', 'warn'); return; }
           if (window.Store.whisper) {
@@ -267,6 +271,10 @@
               {{ m.text }}
             </div>
             <div v-if="!shown.length" class="cs-bubble sys">当前频道还没有消息。</div>
+            <div v-if="S.aiTyping" class="cs-bubble npc typing">
+              <b>{{ S.aiTyping.name }}</b>
+              <span class="typing-dots"><i></i><i></i><i></i></span> 正在发言…
+            </div>
             <div class="pp-v587" v-if="v587On">
               <b>V587 · 三层身份</b>
               <ol>

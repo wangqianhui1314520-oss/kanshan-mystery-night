@@ -2211,10 +2211,18 @@
     if (aiSpeechBusy || !aiSpeechQueue.length) return;
     aiSpeechBusy = true;
     const evt = aiSpeechQueue.shift();
+    /* 微信式"正在发言中"：先显示本席发言占位，applyEvent 后气泡让位给消息 */
+    try {
+      const who = aiActWho(evt);
+      state.aiTyping = { name: who.name || Labels.who(who.role || evt.actor || '') };
+    } catch (e) { state.aiTyping = { name: '在场角色们' }; }
     applyEvent(evt, true);
+    state.aiTyping = null;
     // 给气泡/TTS 留出完整的接话间隔，再轮到下一名 AI。
     setTimeout(() => { aiSpeechBusy = false; drainAiSpeech(); }, 1300);
   }
+  /* 串联发言制：AI 依次发言中（含排队未上屏的）——视图层据此提示消息排队 */
+  function aiSpeaking() { return !!(aiSpeechBusy || aiSpeechQueue.length); }
   function applyEvent(evt, fromSpeechQueue) {
     const p = evt.payload || {};
     track('events', String(evt.type || 'unknown'));
@@ -2354,6 +2362,13 @@
           break;
         }
         if (p.actor_kind === 'player') {
+          /* 乐观回显去重：本地已上屏的同文消息，服务器回执到达时跳过 */
+          const pd = state.pendingEcho;
+          if (mine && pd && pd.text === p.text && Date.now() - pd.at < 15000
+              && pd.team === !!(p.team || payload.team)) {
+            state.pendingEcho = null;
+            break;
+          }
           chat(mine ? 'me' : 'peer', p.text, { char_id: cid, player_id: pid, name: p.player_name || (mine ? '我' : Labels.who(pid)) });
         } else if (p.actor_kind === 'heart') {
           chat('npc', p.text, { char_id: cid, heart: true });
@@ -3237,31 +3252,56 @@
         return true;
       } catch (e) { toast('NPC 私聊通道未接通', 'warn'); return false; }
     },
-    async requestNpcWave() {
+    async requestNpcWave(opts) {
+      const phase = (opts && opts.phase) || '';
+      const fallback = !!(opts && opts.fallback);
       if (state.npcWaveBusy) return false;
       if (state.demo || state.ended || state.isSpectator) { toast('当前模式不可邀请 AI 发言', 'warn'); return false; }
       state.npcWaveBusy = true;
       try {
         if (!this.liveSession()) { const ready = await this.ensureSoloSession(); if (!ready || !this.liveSession()) { toast('单人局服务端未连接，请重试', 'warn'); return false; } }
-        const r = await fetch('/api/session/' + encodeURIComponent(state.sessionId) + '/npc-wave', {
-          method: 'POST', headers: this.llmHeaders(), body: JSON.stringify({ player_id: state.playerId || 'player:1' })
-        });
-        if (!r.ok) { let msg = 'AI 角色发言失败'; try { msg = Labels.apiErr((await r.json()).detail, msg); } catch (e) {} toast(msg, 'warn'); return false; }
-        const j = await r.json();
-        /* AI 介绍按席位依次播报：服务端返回一组事件，前端逐条落地，
-           每位角色之间留出阅读和语音播放时间，避免同一时刻抢麦。 */
-        const events = j.events || [];
-        for (let i = 0; i < events.length; i++) {
-          const ev = events[i];
-          applyEvent(ev);
-          if (i < events.length - 1 && ev && ev.type === 'chat') {
-            await new Promise(resolve => setTimeout(resolve, 1800));
+        /* 全员串联回复（max_roles: 0 = 服务端一次请求按席位顺序逐个调用，
+           每席独立 API、后手带前手上下文；比赛模式已取消本地 QPS 限流，
+           官方 429 由服务端退避重试兜住）。7 席 × 每席最长 ~40s（含重试），
+           超时兜底放宽到 300s，超时或失败按需回退自走棋。 */
+        let anyCount = 0, anyFailed = [];
+        for (let wave = 0; wave < 3; wave++) {
+          const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+          const timer = ctrl ? setTimeout(() => ctrl.abort(), 300000) : null;
+          let r;
+          try {
+            r = await fetch('/api/session/' + encodeURIComponent(state.sessionId) + '/npc-wave', {
+              method: 'POST', headers: this.llmHeaders(), signal: ctrl && ctrl.signal,
+              body: JSON.stringify({ player_id: state.playerId || 'player:1', phase: phase, max_roles: 0 })
+            });
+          } finally { if (timer) clearTimeout(timer); }
+          if (!r.ok) {
+            /* AI 社交通道不可用时回退自走棋兜底，保证破冰不空场 */
+            if (fallback) { this.requestAiWave({ force: true, retries: 2 }); return false; }
+            let msg = 'AI 角色发言失败'; try { msg = Labels.apiErr((await r.json()).detail, msg); } catch (e) {} toast(msg, 'warn'); return false;
           }
+          const j = await r.json();
+          anyCount += (j.count || 0);
+          anyFailed = anyFailed.concat(j.failed_roles || []);
+          /* AI 介绍按席位依次播报：服务端返回一组事件，前端逐条落地，
+             每位角色之间留出阅读和语音播放时间，避免同一时刻抢麦。 */
+          const events = j.events || [];
+          for (let i = 0; i < events.length; i++) {
+            const ev = events[i];
+            applyEvent(ev);
+            if (i < events.length - 1 && ev && ev.type === 'chat') {
+              await new Promise(resolve => setTimeout(resolve, 1800));
+            }
+          }
+          if (!j.count || (typeof j.remaining === 'number' && j.remaining <= 0)) break;   // 全员轮完或没有空席
         }
-        if ((j.failed_roles || []).length) toast('部分角色未能回应，可以稍后再试', 'warn');
-        else if (!j.count) toast('当前没有可发言的 AI 席位', 'warn');
+        if (anyFailed.length) toast('部分角色未能回应，可以稍后再试', 'warn');
+        else if (!anyCount) toast('当前没有可发言的 AI 席位', 'warn');
         return true;
-      } catch (e) { toast('AI 角色发言通道未接通', 'warn'); return false; }
+      } catch (e) {
+        if (fallback) { this.requestAiWave({ force: true, retries: 2 }); return false; }
+        toast('AI 角色发言通道未接通', 'warn'); return false;
+      }
       finally { state.npcWaveBusy = false; }
     },
     async bootPlayMode(mode) {
@@ -3426,7 +3466,11 @@
           }
         } catch (e) { /* live events continue; hydration may be retried on reconnect */ }
         window.Store.toast('已连入房间实时通道', 'ok');
-        if (state.phase === 'play') this.requestAiWave({ retries: 2 });
+        if (state.phase === 'play') {
+          /* 破冰阶段重连：继续跟随 DM 引导的轮流自我介绍；其余阶段自走棋 */
+          if (!state.skipIce && state.stage === 'break_ice') this.requestNpcWave({ phase: 'intro', fallback: true });
+          else this.requestAiWave({ retries: 2 });
+        }
         return true;
       } catch (e) { window.Store.toast('房间通道连接失败：' + (e && e.message || ''), 'warn'); return false; }
     },
@@ -3493,13 +3537,20 @@
       save();
       const kickAi = !state.demo && (state.mode === 'party' || state.playMode === 'main'
         || state.playMode === 'daily' || state.playMode === 'quick');
-      if (kickAi && state.mode !== 'party' && !this.liveSession()) {
+      if (!kickAi) return;
+      /* 破冰跟随 DM 引导：DM 刚说"先听听自我介绍"，AI 席位按 intro 模板轮流
+         介绍自己（npc-wave 社交通道）；跳过破冰或 AI 不可用时回退自走棋。 */
+      if (!state.skipIce && state.stage === 'break_ice') {
+        this.requestNpcWave({ phase: 'intro', fallback: true });
+        return;
+      }
+      if (state.mode !== 'party' && !this.liveSession()) {
         this.ensureSoloSession().then(() => this.requestAiWave({ retries: 4 }));
-      } else if (kickAi) {
+      } else {
         this.requestAiWave({ retries: 4 });
       }
     },
-    state, Engine, applyEvent, toast, banner, pushDmaku, chat,
+    state, Engine, applyEvent, toast, banner, pushDmaku, chat, aiSpeaking,
     locClueLeft, locTier, flawCount, ownedClues, hasKc, heartOf, coverage, evidenceCoverage,
     studioMiniCatalog() {
       const reg = (window.Minis && window.Minis.REG) || {};
@@ -3537,7 +3588,8 @@
           state.bookletForced = 'A';
           this.hydrateBooklet();
         }
-        this.requestAiWave({ force: true, retries: 3 });
+        /* 破冰圆桌跟随 DM 引导：AI 席位按 intro 模板轮流自我介绍 */
+        this.requestNpcWave({ phase: 'intro', fallback: true });
       }
     },
     cutDismiss() { if (state.showtime) state.showtime.cut = null; },
@@ -3632,6 +3684,21 @@
         const next = (Store._sendQ || []).shift();
         if (next) Store.send(next[0], next[1]);
       }, 700);
+      /* 微信式乐观回显：自己的话发送成功立即上屏，不等服务器回执事件；
+         服务器回执到达时 applyEvent 按 pendingEcho 去重跳过重复渲染。 */
+      if (action === 'chat' && ok && payload.text) {
+        chat('me', payload.text, { local: true, team: payload.team === true });
+        state.pendingEcho = {
+          text: payload.text,
+          target: payload.target || payload.char_id || '',
+          team: payload.team === true,
+          at: Date.now()
+        };
+        /* 玩家动作后服务端自动跑 AI 波：先给"正在发言"占位，首条 AI 气泡到达时替换 */
+        if (state.netKind === 'ws') {
+          state.aiTyping = state.aiTyping || { name: '在场角色们', placeholder: true };
+        }
+      }
       return true;
     },
     reset, M, buildTruthProfile, demoRailSteps, startJudgeLine,
