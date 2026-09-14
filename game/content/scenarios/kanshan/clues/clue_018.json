@@ -1,0 +1,19 @@
+{
+  "id": "clue_018",
+  "name": "彩蛋碎片二·比武判词卷",
+  "tier": "hidden",
+  "location": "档案室",
+  "tags": [
+    "剧中剧",
+    "判词",
+    "碎片"
+  ],
+  "fact": "判词卷：『二师姐听不懂 What's your name？遗憾出局，三师兄背不出〈杨花落尽子规啼〉的下一句惨遭重伤。』页边批注：灵感来源见第 7 章——不，第 7 章还没写。",
+  "flavor_hint": "描写判词卷上被划掉又补上的『第 7 章』三个字，笔迹越来越轻，像写的人自己也没底。",
+  "linked_truth_nodes": [
+    "tn_egg"
+  ],
+  "unlock_condition": "evidence:clue_017",
+  "fake_of": null,
+  "flaw_id": null
+}

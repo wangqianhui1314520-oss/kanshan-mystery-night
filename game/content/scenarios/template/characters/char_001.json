@@ -1,0 +1,34 @@
+{
+  "$schema": "角色卡模板：每个角色一个文件，存于 characters/。role_type: player=真人玩家 | npc=AI扮演",
+  "id": "char_001",
+  "name": "林晚",
+  "role_type": "player",
+  "public_profile": {
+    "age": 26,
+    "occupation": "城西小报调查记者",
+    "appearance": "风衣、旧相机，常年在码头徘徊",
+    "personality": "敏锐、克制、习惯性反问"
+  },
+  "secret": {
+    "real_identity": "失踪画家阿岚的妹妹，隐姓埋名进雾城调查",
+    "motive": "查明姐姐失踪真相",
+    "guilt": "无，但曾向姐姐隐瞒父亲的死讯"
+  },
+  "task": {
+    "goal": "找到阿岚，并把走私链证据公之于众",
+    "must_do": ["至少搜证 2 次", "在圆桌阶段公开至少 1 条关键证据"],
+    "must_not_do": ["不能暴露自己是阿岚妹妹（除非证据确凿）"]
+  },
+  "relations": {
+    "char_002": "旅店老板娘，疑似知道内情，需谨慎试探",
+    "npc_001": "阿岚，失踪者，亲姐姐"
+  },
+  "memory": {
+    "short_term": [],
+    "long_term": []
+  },
+  "ai_binding": {
+    "agent_prompt": "../../../agents/prompts/npc_system.md",
+    "rag_tags": ["雾城世界观", "阿岚相关", "码头走私案"]
+  }
+}

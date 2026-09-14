@@ -1,0 +1,19 @@
+{
+  "id": "clue_031",
+  "name": "破绽四·唤醒词彩蛋",
+  "tier": "boss_flaw",
+  "location": "对话框",
+  "tags": [
+    "唤醒词",
+    "彩蛋",
+    "系统"
+  ],
+  "fact": "玩家在对话框试出锁门系统唤醒词『看山，关门』——系统回了一句『好的……啊不，权限校验失败』。AI 也会口误。",
+  "flavor_hint": "描写对话框那 0.5 秒的沉默与弹幕的狂欢：它应了！它应了！",
+  "linked_truth_nodes": [
+    "btn_01"
+  ],
+  "unlock_condition": "chat:keyword_看山，关门",
+  "fake_of": null,
+  "flaw_id": "flavor_4"
+}

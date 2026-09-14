@@ -1,0 +1,20 @@
+{
+  "id": "clue_013",
+  "name": "看山Bot 的真实日志",
+  "tier": "limited",
+  "location": "服务器机房",
+  "tags": [
+    "日志",
+    "删除",
+    "哈希"
+  ],
+  "fact": "看山Bot 日志：22:30 收到指令并执行『删除 21:07-21:15 备份与自身缓存』，指令头被涂黑，仅余『主人级』三字；日志末尾多了一行只有机器会写的固执——已删内容哈希值：A3F9-77C2。",
+  "flavor_hint": "描写日志里那行倔强的哈希值像机器人留下的求救信号，可吐槽『诚实协议比人可靠系列』。",
+  "linked_truth_nodes": [
+    "tn_09",
+    "btn_02"
+  ],
+  "unlock_condition": "memory:char_05:3",
+  "fake_of": null,
+  "flaw_id": null
+}

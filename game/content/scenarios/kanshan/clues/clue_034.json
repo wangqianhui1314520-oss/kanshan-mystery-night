@@ -1,0 +1,15 @@
+{
+  "id": "clue_034",
+  "name": "法官采信",
+  "tier": "limited",
+  "location": "档案局·审判席",
+  "tags": ["辩论", "法官", "采信"],
+  "fact": "法官放下笔：「证据链成立，本庭采信你的陈述。」——一个被舆论带偏过的 AI 裁判，被你用实证拉了回来。",
+  "flavor_hint": "S4 辩论机制奖励：法官立场从 skeptical 迁移到 convinced 的瞬间演出。",
+  "linked_truth_nodes": ["btn_01"],
+  "unlock_condition": "debate:convinced",
+  "auto_grant_on_boss_final": false,
+  "_note": "S4 AI 法官辩论机制奖励线索。实际发放由 server/engine_driver 在 debate_submit 达标（JudgeDebate.convinced）时显式调用 EvidenceChain.release('clue_034', actor)。",
+  "fake_of": null,
+  "flaw_id": null
+}

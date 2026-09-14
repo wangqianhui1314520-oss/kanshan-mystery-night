@@ -1,0 +1,28 @@
+{
+  "owner": "char_08",
+  "version": 1,
+  "blocks": [
+    {
+      "id": "blk_c08_1",
+      "time": "20:20",
+      "layer": "said",
+      "text": "新人报道！第一次见档案局！居然有人失踪！这也太刺激了吧！！",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c08_2",
+      "time": "21:12",
+      "layer": "said",
+      "text": "我全程在大厅吃瓜，哪儿都没去！",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c08_3",
+      "time": "22:00",
+      "layer": "said",
+      "text": "这个梗是什么意思？【已打码】是什么梗？在线等，挺急的！",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": []
+}

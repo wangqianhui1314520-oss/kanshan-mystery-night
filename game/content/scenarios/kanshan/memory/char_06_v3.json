@@ -1,0 +1,67 @@
+{
+  "owner": "char_06",
+  "version": 3,
+  "blocks": [
+    {
+      "id": "blk_c06_1",
+      "time": "20:55",
+      "layer": "said",
+      "text": "我去档案室续命我的老答案。[该发言已被折叠]",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c06_2",
+      "time": "21:30",
+      "layer": "said",
+      "text": "档案室有动静。暗门。毛茸茸的背影。我看清了，全部看清了。[该发言已被折叠]",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c06_2h",
+      "time": "21:31",
+      "layer": "heart",
+      "text": "（心声）看到了！暗门！毛茸茸的背影！个子不高，尾巴很大！……可是我说出去，会不会连这句话都被折叠？",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c06_2h2",
+      "time": "21:32",
+      "layer": "heart",
+      "text": "（心声）三年了。上次我说『这数据有问题』，被折叠。这次我说『看山回来了』，估计还是被折叠。折叠区没有侦探，只有怨灵。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c06_4",
+      "time": "22:50",
+      "layer": "said",
+      "text": "我整理过档案局所有悬案：每一起的开头，都是一句没人较真的谣言。[该发言已被折叠]",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c06_4h",
+      "time": "22:51",
+      "layer": "heart",
+      "text": "（心声）第 7 章答案里我写过今天这种局面。第 7 章被折叠的那天我就知道，档案局迟早再出一次『没人较真』的案子。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c06_5",
+      "time": "23:00",
+      "layer": "said",
+      "text": "你们终于开始问了。行，我从 20:55 讲起，一个字都不跳。[该发言已被折叠]",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": [
+    {
+      "block": "blk_c06_2",
+      "change": "无篡改：V3 口供升级——『没看清』改为『全部看清了』（勇气被开导后的第一次较真）",
+      "tamper_point": null
+    },
+    {
+      "block": "blk_c06_4",
+      "change": "新增悬案总结与第 7 章关联（隐藏真结局钥匙的口供锚点）",
+      "tamper_point": null
+    }
+  ]
+}

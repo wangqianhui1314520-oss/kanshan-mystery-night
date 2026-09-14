@@ -1,0 +1,25 @@
+{
+  "id": "clue_012",
+  "name": "水军矩阵账号清单",
+  "tier": "limited",
+  "location": "热搜后台",
+  "tags": [
+    "水军",
+    "矩阵",
+    "设备指纹"
+  ],
+  "fact": "47 个马甲号注册设备指纹同源，发帖模板一致；清单页脚一行小字：『矩阵_K 监制』。",
+  "flavor_hint": "描写清单整齐得像军训点名册，可加弹幕：好家伙，一个人开了一个师。",
+  "linked_truth_nodes": [
+    "tn_06",
+    "tn_05"
+  ],
+  "unlock_condition": "evidence:clue_005",
+  "fake_of": null,
+  "flaw_id": null,
+  "sides": {
+    "front": "47 个马甲号注册设备指纹同源，发帖模板一致；清单页脚一行小字：『矩阵_K 监制』。",
+    "back": "页脚被折过：监制栏背面写着『执行：流量酱。头子另有其人。』这是正面不敢公开的半句。",
+    "back_condition": "evidence:clue_005"
+  }
+}

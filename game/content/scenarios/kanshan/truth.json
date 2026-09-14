@@ -1,0 +1,307 @@
+{
+  "truth_summary": "表层：资深答主『知之者』因流量焦虑堕落为水军头子（矩阵_K），遥控被裹挟的流量酱刷帖删记录、篡改记忆存证；看山Bot 只是执行『主人级指令』的傀儡。里层：整场失踪与封局是刘看山自导自演的钓鱼执法——他假失踪、锁大门、扮系统提示音，钓出记忆编辑产业链，顺便逼 8 个人直面被信息污染的心病。你们破的局，正是看山设的局。",
+  "culprit": {
+    "character": "char_01",
+    "name": "知之者（真水军头子『矩阵_K』）",
+    "crime": "组织水军污染信息 + 指使篡改记忆存证",
+    "motive": "十年答主流量下滑，陷入『有热度才有一切』的稀缺心态；怕看山查到记忆编辑灰色产业、掀出当年成名作的数据造假，先下手为强",
+    "method": "以 47 个设备指纹同源的马甲号组成水军矩阵带节奏；遥控流量酱在 21:10-21:25 用热搜后台『热度管理工具』刷帖删记录并篡改其本人与路人甲的记忆存证；借 V587 的误会把水军线往新人身上引",
+    "accomplices": [
+      {
+        "character": "char_03",
+        "name": "流量酱",
+        "role": "执行者（被裹挟者，可策反）",
+        "swayable": true
+      },
+      {
+        "character": "char_04",
+        "name": "路人甲",
+        "role": "被忽悠自改口供的目击者（被裹挟者，可策反）",
+        "swayable": true
+      }
+    ],
+    "evidence_chain": [
+      "clue_005",
+      "clue_012",
+      "clue_014",
+      "clue_015"
+    ]
+  },
+  "boss_layer": {
+    "boss": "kanshan（刘看山）",
+    "title": "DM = 最大隐藏 Boss（非反派：设局的求真侦探）",
+    "motive": "正面动机：发现档案局混入记忆编辑产业链，打草惊蛇会跑——于是自导自演失踪，把所有人锁进『出不去的档案局』，让污染行为在局内自然复发、当场现形，顺便逼 8 个人直面自己被信息污染的心病",
+    "method": "假失踪（21:00 从档案室暗门进入局控室）；亲手写【不出真相，不出此门】横幅并启用唤醒词『看山，关门』；扮『叮——系统提示音』DM 人格控场；令看山Bot 删除 21:07-21:15 监控与自身缓存以防穿帮；雇 V587 扮新人做局内眼",
+    "reveal_condition": "集齐 5 个 boss_flaw 线索（flavor_1..5）→ 指认阶段解锁【指认：DM 刘看山】。G04：flavor_5(clue_032) 门控 review:credits + auto_grant_on_boss_final，进入指认幕（accuse）即发放，vote 前 boss_ready 为 true。",
+    "signature_quote": "你们破的局，正是看山设的局。",
+    "fail_branch": "破绽不足 5 时指认 DM → 群嘲结局『你连 DM 都想锤？』（欢乐向，不惩罚）",
+    "flaws": [
+      {
+        "id": "flaw_1",
+        "name": "鱼干口味口误",
+        "clue": "clue_028",
+        "desc": "第一幕 DM 吐槽说漏『看山只吃彩虹鳟鱼味』——只有失踪者本人才知道"
+      },
+      {
+        "id": "flaw_2",
+        "name": "最高权限删除",
+        "clue": "clue_029",
+        "desc": "删除监控的 KS-000 是局长级令牌，全局仅看山掌握"
+      },
+      {
+        "id": "flaw_3",
+        "name": "主人级签名",
+        "clue": "clue_030",
+        "desc": "看山Bot 被删日志指令头带『主人级指令 KS-000』签名（需知识卡 kc_06 开导看山Bot 后出现）"
+      },
+      {
+        "id": "flaw_4",
+        "name": "唤醒词彩蛋",
+        "clue": "clue_031",
+        "desc": "玩家在对话框试出『看山，关门』，系统口误回弹"
+      },
+      {
+        "id": "flaw_5",
+        "name": "策划签名",
+        "clue": "clue_032",
+        "desc": "复盘页署名列表底一行小字：『本局由刘看山亲自策划——策划你的策划。』"
+      }
+    ]
+  },
+  "truth_nodes": [
+    {
+      "id": "tn_01",
+      "name": "看山失踪之谜",
+      "desc": "21:00 看山进档案室后消失；请假条、鱼干罐与冰袋快递指向『有计划的离席』",
+      "proof_clues": [
+        "clue_002",
+        "clue_004",
+        "clue_007",
+        "clue_011"
+      ],
+      "npc_witness": [
+        "char_06",
+        "char_04"
+      ]
+    },
+    {
+      "id": "tn_02",
+      "name": "锁门与全息横幅",
+      "desc": "【不出真相，不出此门】由内部最高权限令牌 KS-000 下发",
+      "proof_clues": [
+        "clue_001",
+        "clue_003"
+      ],
+      "npc_witness": [
+        "char_07"
+      ]
+    },
+    {
+      "id": "tn_03",
+      "name": "监控删除",
+      "desc": "21:07-21:15 监控被局长级账号人为删除，机房同期异常高负载",
+      "proof_clues": [
+        "clue_009",
+        "clue_010",
+        "clue_013"
+      ],
+      "npc_witness": [
+        "char_05"
+      ]
+    },
+    {
+      "id": "tn_04",
+      "name": "记忆芯片编辑",
+      "desc": "多人记忆存证被『热度管理工具』篡改，口供与心声矛盾处即篡改点",
+      "proof_clues": [
+        "clue_014",
+        "clue_015"
+      ],
+      "npc_witness": [
+        "char_03",
+        "char_04"
+      ]
+    },
+    {
+      "id": "tn_05",
+      "name": "水军带节奏",
+      "desc": "热搜热度 21:10 起非自然阶梯式增长，47 个马甲号设备指纹同源",
+      "proof_clues": [
+        "clue_005",
+        "clue_012",
+        "clue_014"
+      ],
+      "npc_witness": [
+        "char_03"
+      ]
+    },
+    {
+      "id": "tn_06",
+      "name": "水军头子真身",
+      "desc": "矩阵_K 监制清单与后台操作链指向知之者",
+      "proof_clues": [
+        "clue_012",
+        "clue_014"
+      ],
+      "npc_witness": [
+        "char_03"
+      ]
+    },
+    {
+      "id": "tn_07",
+      "name": "被裹挟者",
+      "desc": "流量酱（把柄+人情）与路人甲（被忽悠改口供）均可策反",
+      "proof_clues": [
+        "clue_012",
+        "clue_014",
+        "clue_015"
+      ],
+      "npc_witness": [
+        "char_03",
+        "char_04"
+      ]
+    },
+    {
+      "id": "tn_08",
+      "name": "V587 三层身份",
+      "desc": "新用户→两年前被封的老号『侦探爱好者联盟』→看山的影子学徒",
+      "proof_clues": [
+        "clue_016"
+      ],
+      "npc_witness": [
+        "char_08"
+      ]
+    },
+    {
+      "id": "tn_09",
+      "name": "科技伦理·被删日志",
+      "desc": "看山Bot 执行主人级指令删除日志，但固执地留下哈希值",
+      "proof_clues": [
+        "clue_010",
+        "clue_013"
+      ],
+      "npc_witness": [
+        "char_05"
+      ]
+    },
+    {
+      "id": "tn_10",
+      "name": "心病图谱",
+      "desc": "全档案局都在借心理学书——每人的心病就是线索本身",
+      "proof_clues": [
+        "clue_008",
+        "clue_019"
+      ],
+      "npc_witness": [
+        "char_01",
+        "char_02",
+        "char_03",
+        "char_04",
+        "char_05",
+        "char_06",
+        "char_07",
+        "char_08"
+      ]
+    },
+    {
+      "id": "tn_egg",
+      "name": "彩蛋线·被删的第 7 章",
+      "desc": "笔上仙剧中剧《学科修仙》改写的 5 枚碎片（设定致敬六酒《学科修仙》）",
+      "proof_clues": [
+        "clue_017",
+        "clue_018",
+        "clue_019",
+        "clue_020",
+        "clue_021"
+      ],
+      "npc_witness": [
+        "char_02",
+        "char_06"
+      ]
+    },
+    {
+      "id": "btn_01",
+      "name": "里层·看山设局",
+      "desc": "假失踪+锁门+系统音=看山本人",
+      "proof_clues": [
+        "clue_028",
+        "clue_031",
+        "clue_032"
+      ],
+      "npc_witness": []
+    },
+    {
+      "id": "btn_02",
+      "name": "里层·主人级指令链",
+      "desc": "监控删除与日志删除同源 KS-000",
+      "proof_clues": [
+        "clue_009",
+        "clue_013",
+        "clue_029",
+        "clue_030"
+      ],
+      "npc_witness": [
+        "char_05"
+      ]
+    },
+    {
+      "id": "btn_03",
+      "name": "里层·钓鱼目的",
+      "desc": "钓出记忆编辑产业链 + 心病开导（知识卡体系）",
+      "proof_clues": [
+        "clue_008",
+        "clue_016"
+      ],
+      "npc_witness": []
+    }
+  ],
+  "endings": [
+    {
+      "id": "ending_perfect",
+      "name": "完美还原",
+      "condition": "指认知之者命中 + truth_node 覆盖 ≥90%"
+    },
+    {
+      "id": "ending_truth",
+      "name": "真相大白",
+      "condition": "指认命中 + 覆盖 60-89%"
+    },
+    {
+      "id": "ending_redemption",
+      "name": "沉冤得雪",
+      "condition": "错误指认，但被裹挟者（流量酱/路人甲）跳反成功"
+    },
+    {
+      "id": "ending_pollution",
+      "name": "污染胜利",
+      "condition": "污染阵营成功把热度带偏至终局"
+    },
+    {
+      "id": "ending_chapter7",
+      "name": "隐藏·被删的第 7 章",
+      "condition": "集齐彩蛋碎片 clue_017..021（5 枚）+ kc_01 开导沉底君成功（boss_key：第 7 章答案重新上架）"
+    },
+    {
+      "id": "ending_sunny",
+      "name": "隐藏·全员心晴",
+      "condition": "知识开导成功 ≥4 人：看山自己推门回来（『我就是出去买了袋鱼干，你们倒把我局给破了？』）"
+    },
+    {
+      "id": "ending_fish",
+      "name": "隐藏·看山的鱼干",
+      "condition": "沉底君好感拉满 + V587 三层真身揭穿"
+    },
+    {
+      "id": "ending_kanshan",
+      "name": "终极·看山还是山",
+      "condition": "指认 DM 成功（破绽 ≥5）+ 心晴诊室开导 ≥2：看山现身承认设局，污染源当场抓获，全员毕业出局——这一局的『局』本身就是最大彩蛋"
+    },
+    {
+      "id": "ending_boss_fail",
+      "name": "群嘲分支·你连 DM 都想锤？",
+      "condition": "指认 DM 但破绽 <5：全场群嘲，欢乐复盘，不惩罚"
+    }
+  ],
+  "attribution": "本剧本缝合改编自盐言故事：《不提分就出不去的房间》作者灯灯、《穿越大明，我被崇祯偷听心声》作者凉风有信、《咪假虎威》作者反骨、彩蛋线致敬《学科修仙》作者六酒；10 张知识卡源自知乎知识 10 篇（作者见 knowledge_cards/ 与 scripts/credits.md）。开场页与复盘页常驻署名。",
+  "ai_rule": "Agent 无权改证据事实（fact 字段），只演不裁；AI 扩写仅限 flavor_hint 自由度。"
+}

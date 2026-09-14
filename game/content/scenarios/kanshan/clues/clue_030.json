@@ -1,0 +1,20 @@
+{
+  "id": "clue_030",
+  "name": "破绽三·主人级签名",
+  "tier": "boss_flaw",
+  "location": "服务器机房",
+  "tags": [
+    "日志",
+    "签名",
+    "主人级"
+  ],
+  "fact": "看山Bot 被删日志的指令头签名：『主人级指令 KS-000』，附言还带着鱼干表情包——科技伦理线在此与 Boss 线交汇。",
+  "flavor_hint": "描写日志里那个格格不入的鱼干表情，机器的严谨与人设的嘴损同框。",
+  "linked_truth_nodes": [
+    "btn_02",
+    "tn_09"
+  ],
+  "unlock_condition": "counsel:kc_06",
+  "fake_of": null,
+  "flaw_id": "flavor_3"
+}

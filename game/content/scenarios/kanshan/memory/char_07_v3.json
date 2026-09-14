@@ -1,0 +1,60 @@
+{
+  "owner": "char_07",
+  "version": 3,
+  "blocks": [
+    {
+      "id": "blk_c07_1",
+      "time": "20:50",
+      "layer": "said",
+      "text": "我去仓库领了点打印纸，21 点前就回来了，前台一直有路人甲帮着看。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c07_2",
+      "time": "21:47",
+      "layer": "said",
+      "text": "我 21 点 47 发现门禁异常，立刻在系统里留言了。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c07_2h",
+      "time": "21:41",
+      "layer": "heart",
+      "text": "（心声）最高权限令牌……上报？报错了怎么办？得罪了领导怎么办？万一是我看错了呢？『建议关注』——这四个字显得我好聪明，可我好怂。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c07_2hh",
+      "time": "21:46",
+      "layer": "heart",
+      "text": "（心声）肠子都悔青了。早 20 分钟上报，横幅也许根本挂不起来。体面体面，多少锅假体面之名。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c07_4",
+      "time": "23:00",
+      "layer": "said",
+      "text": "门禁原始记录我这里有一份。谁要看？……真有人要看吗？还是先别……好吧，要看给。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c07_4h",
+      "time": "23:00",
+      "layer": "heart",
+      "text": "（心声）如果有人认真听完我的记录，我就把『建议关注』改成『强烈关注』。",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": [
+    {
+      "block": "blk_c07_2",
+      "change": "said 层维持美化；心声补全悔意与交出记录的临界条件",
+      "tamper_point": "tp_05"
+    },
+    {
+      "block": "blk_c07_4",
+      "change": "新增 23:00 愿意交出门禁原始记录（官方时间线锚点）",
+      "tamper_point": null
+    }
+  ]
+}

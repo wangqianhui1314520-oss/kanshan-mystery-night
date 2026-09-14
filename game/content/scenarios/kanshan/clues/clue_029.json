@@ -1,0 +1,19 @@
+{
+  "id": "clue_029",
+  "name": "破绽二·最高权限删除",
+  "tier": "boss_flaw",
+  "location": "监控室",
+  "tags": [
+    "监控",
+    "最高权限",
+    "KS-000"
+  ],
+  "fact": "删除监控用的 KS-000 是局长级令牌，全局只有看山掌握——『失踪』的人删了监控？除非他没走远。",
+  "flavor_hint": "描写权限表上孤零零的一个名字与玩家起鸡皮疙瘩的瞬间。",
+  "linked_truth_nodes": [
+    "btn_02"
+  ],
+  "unlock_condition": "默认",
+  "fake_of": null,
+  "flaw_id": "flavor_2"
+}

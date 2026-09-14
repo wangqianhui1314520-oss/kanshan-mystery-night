@@ -1,0 +1,52 @@
+{
+  "$schema": "案发时间线模板：所有角色的行动轨迹，NPC 证词必须与此一致（一致性守卫校验依据）",
+  "case_time": "第 7 日 20:00 - 第 8 日 07:00",
+  "timeline": [
+    {
+      "time": "20:00",
+      "character": "char_001",
+      "location": "码头旅店",
+      "action": "办理入住，发现前台留言条",
+      "public": true
+    },
+    {
+      "time": "20:30",
+      "character": "char_002",
+      "location": "旅店大堂",
+      "action": "与一陌生男人交谈，神色紧张（说谎点：声称不认识对方）",
+      "public": false
+    },
+    {
+      "time": "21:00",
+      "character": "npc_001",
+      "location": "七号仓码头",
+      "action": "被赵四手下带入七号仓，随身画作被扣",
+      "public": false
+    },
+    {
+      "time": "22:15",
+      "character": "char_001",
+      "location": "旅店房间",
+      "action": "发现床板夹层字条",
+      "public": true
+    },
+    {
+      "time": "23:40",
+      "character": "char_002",
+      "location": "七号仓后门",
+      "action": "目击纱厂货车卸货（可作证词，但起初隐瞒）",
+      "public": false
+    },
+    {
+      "time": "01:00",
+      "character": "npc_001",
+      "location": "七号仓地下室",
+      "action": "被转移至红门内房间，画架上的红门画被泼墨",
+      "public": false
+    }
+  ],
+  "rules": {
+    "npc_statement_must_match": true,
+    "player_can_challenge": "当玩家出示线索与 NPC 证词矛盾时，NPC 必须解释或修正"
+  }
+}

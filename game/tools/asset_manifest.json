@@ -1,0 +1,316 @@
+[
+  {
+    "type": "image",
+    "out": "content/assets/images/char_zhizhizhe.png",
+    "size": "720x1440",
+    "prompt": "30岁左右男性角色全身立绘，资深网络答主气质：银边眼镜、深蓝色西装马甲配白衬衫、手持发光平板电脑，自信从容的微笑，站姿，简约深色背景带蓝色全息光环"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/char_liuliangjiang.png",
+    "size": "720x1440",
+    "prompt": "20岁女性角色全身立绘，热榜话题达人：亮橙色连帽卫衣、头戴耳罩耳机、举着带直播支架的手机、夸张兴奋的表情，站姿，简约深色背景带蓝色全息光环"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/char_lurenjia.png",
+    "size": "720x1440",
+    "prompt": "20多岁角色全身立绘，匿名吃瓜群众：灰色连帽衫帽子半遮脸、抱着一颗大西瓜、懒散随意的站姿，简约深色背景带蓝色全息光环"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/char_chendijun.png",
+    "size": "720x1440",
+    "prompt": "半透明幽灵程序员全身立绘：浓重黑眼圈、格子衬衫、身上缠绕着许多被折起的纸张、颓废又搞笑的表情、微微飘浮离地，简约深色背景带蓝色全息光环"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/char_bishangxian.png",
+    "size": "720x1440",
+    "prompt": "20多岁男性角色全身立绘，网络小说作家气质：中长发、古风披肩混搭现代卫衣、怀里抱着飘出的稿纸、戏剧化的深沉表情，站姿，简约深色背景带蓝色全息光环"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/char_kanshanbot.png",
+    "size": "720x1440",
+    "prompt": "圆润可爱的桌面机器人全身立绘：白色圆润机身、蓝色发光屏幕脸显示简洁表情、头顶小天线带蓝色光点、姿态憨厚，简约深色背景带蓝色全息光环"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/char_yanzhijun.png",
+    "size": "720x1440",
+    "prompt": "30岁男性角色全身立绘，社区官方管家人设：深蓝色制服马甲、胸前工作牌、手持记事本、职业化客套微笑但额头带一滴汗，站姿，简约深色背景带蓝色全息光环"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/char_v587.png",
+    "size": "720x1440",
+    "prompt": "神秘人物全身立绘：全黑连帽衫与口罩遮面、只露出镜片反光的眼睛、手里发光的手机屏幕照亮下巴、警惕站姿，简约深色背景带蓝色全息光环"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_hall.png",
+    "size": "1440x720",
+    "prompt": "深夜的神秘档案局大厅内景，环形档案柜围绕四周，中央悬浮全息档案卡片与蓝色HUD界面，墙上贴着一张北极狐剪影海报，暖黄台灯光与冷色屏幕光对比，空无一人"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_monitor.png",
+    "size": "1440x720",
+    "prompt": "老式监控室内景，一排闪烁的监控屏幕，其中一块屏幕的时间轴上有一段刺眼的空洞，冷蓝色调，一把空转椅，悬疑氛围"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_teahouse.png",
+    "size": "1440x720",
+    "prompt": "深夜档案局茶水间内景，饮水机、泡面堆成的小山、半块鱼干点心放在桌上、便利贴贴满墙壁、暖黄灯光，喜剧生活气息"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_server.png",
+    "size": "1440x720",
+    "prompt": "服务器机房内景，一排排机柜蓝光闪烁，风扇狂转的服务器 rack 前有一台屏幕还亮着，地面有散落的网线，冷蓝色调悬疑氛围"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_roof.png",
+    "size": "1440x720",
+    "prompt": "深夜城市天台内景，护栏边能看到远处城市霓虹天际线，地上有一个鱼干包装袋随风飘动，月光与城市光污染交融，悬疑氛围"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_hotfeed.png",
+    "size": "1440x720",
+    "prompt": "热搜运营控制室内景，巨大的热搜榜单数据大屏、滚动的话题词条瀑布流、多台工作站的蓝色屏幕光，无人物，赛博HUD风格"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_reception.png",
+    "size": "1440x720",
+    "prompt": "档案局前台内景，弧形接待台上有访客登记本和一盆仙人掌，背景是发光的机构徽标墙，夜晚无人，暖黄与冷蓝光对比"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/logo_badge.png",
+    "size": "1024x1024",
+    "prompt": "神秘侦探机构圆形徽标设计：金属徽章质感，中心一只优雅的北极狐剪影举着放大镜，环绕档案盒与星点，深蓝底色配金色描边与蓝色霓虹光晕，扁平徽章插画，居中构图"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/card_back.png",
+    "size": "1024x1440",
+    "prompt": "卡牌背面花纹设计：深蓝紫渐变底，细密档案网格纹理与HUD光路装饰，中央一枚发光的圆形狐狸徽章水印，四角有科技边框，对称构图，扁平插画质感"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/dm_kanshan_holo.png",
+    "size": "720x1440",
+    "prompt": "全息投影风格的北极狐侦探全身像：半透明蓝色发光线条构成的狐狸形象，戴侦探帽与围巾，站姿挺拔自信，脚下有全息投影基座光圈，数据流粒子环绕，深色背景，科技感与神秘感"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_exterior.png",
+    "size": "1440x720",
+    "prompt": "深夜城市中一栋高楼顶层的神秘档案局外观，巨大的知乎蓝色霓虹机构招牌，玻璃幕墙透出暖黄灯光，楼顶有全息光柱射向夜空，楼下街道空无一人，电影感构图"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_desk_kanshan.png",
+    "size": "1440x720",
+    "prompt": "侦探的办公工位内景，木质桌面上有放大镜、案件照片、散落的线索便签和一袋咬过的鱼干零食，台灯暖光，背后是软木案件板，悬疑氛围"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_archive.png",
+    "size": "1440x720",
+    "prompt": "档案室内景，密集的铁皮档案柜阵列，一柜门半开露出泛黄卷宗，地上有一张滑落的旧照片，冷白灯光与尘埃光束，悬疑氛围"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_locker.png",
+    "size": "1440x720",
+    "prompt": "员工快递柜内景，一格柜门虚掩透出蓝光，柜面贴着便利贴与卡通贴纸，格子编号发光，深色调，悬疑氛围"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_hvac.png",
+    "size": "1440x720",
+    "prompt": "大楼空调机房内景，粗大的通风管道与机组设备，一块检修面板半开，管道上贴着一张手写标签，蓝灰冷色调，悬疑氛围"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_study_room.png",
+    "size": "1440x720",
+    "prompt": "温馨的心晴自习室内景，书架上摆满心理学书籍，书桌上有台灯、热可可和知识卡片散落，一盆绿植，暖黄灯光配蓝色HUD知识卡片全息悬浮，治愈氛围"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_director_office.png",
+    "size": "1440x720",
+    "prompt": "神秘的局长办公室内景，宽大办公桌后是整墙的金字塔形荣誉陈列，桌上有老式电话与上锁的抽屉，一盏绿罩台灯，深夜氛围，电影感构图"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/scene_corridor.png",
+    "size": "1440x720",
+    "prompt": "深夜档案局走廊内景，一排档案柜尽头有蓝色光透出，地面倒映霓虹光，尽头的门上有发光门牌，悬疑氛围，空无一人"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ach_mountain.png",
+    "size": "1024x1024",
+    "prompt": "圆形成就徽章：一只狐狸剪影坐在远山之巅望向群山，禅意山水与霓虹勾边，金属徽章质感，深蓝底金描边"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ach_heart_doctor.png",
+    "size": "1024x1024",
+    "prompt": "圆形成就徽章：发光的爱心与听诊器缠绕，周围柔和光点如治愈粒子，金属徽章质感，深蓝底金描边配暖粉光晕"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ach_rhythm_king.png",
+    "size": "1024x1024",
+    "prompt": "圆形成就徽章：燃烧的音符与闪电缠绕成王冠形状，电音节奏感光轨，金属徽章质感，深蓝底金描边配橙色火光"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ach_fish_guardian.png",
+    "size": "1024x1024",
+    "prompt": "圆形成就徽章：中央一条发光的鱼干与护卫盾牌纹章，四周小鱼游动环绕，金属徽章质感，深蓝底金描边配青色光晕"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ach_antifold.png",
+    "size": "1024x1024",
+    "prompt": "圆形成就徽章：一张展开的纸张长出翅膀自由飞翔，挣脱折叠线的束缚，金属徽章质感，深蓝底金描边配白色光晕"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ach_darkroom.png",
+    "size": "1024x1024",
+    "prompt": "圆形成就徽章：暗房红灯下悬挂的照片底片与放大镜，显影液波纹纹理，金属徽章质感，深蓝底金描边配红色暗房灯氛围"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ach_public_enemy.png",
+    "size": "1024x1024",
+    "prompt": "圆形成就徽章：俏皮的恶魔小尾巴缠绕一顶歪戴的皇冠，周围星星与捣蛋光效，欢乐反派气质，金属徽章质感，深蓝底金描边配紫色光晕"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/icon_fish.png",
+    "size": "512x512",
+    "prompt": "游戏收集品图标：一根发光的金黄鱼干零食，圆润卡通造型带蓝色描边与星星闪光特效，深色透明感背景，扁平插画"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/icon_rumor.png",
+    "size": "512x512",
+    "prompt": "游戏障碍物图标：带尖刺的深紫色对话气泡，气泡上缠绕杂乱乱线与感叹号图形，发出不祥的紫光，扁平插画风格"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_dossier_bg.png",
+    "size": "1440x720",
+    "prompt": "侦探证件卡背景底纹：深蓝紫渐变底，细密档案网格与全息光路，左侧留白区域有淡淡的北极狐剪影水印，四角金属铆钉装饰，横向卡片构图，扁平插画质感"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_roundtable.png",
+    "size": "1440x720",
+    "prompt": "剧本杀大圆桌俯视图：深蓝色圆形桌面带知乎蓝色全息光环与发光纹路，12 个座位均匀环绕每个座位有柔和的蓝色聚光灯与姓名牌卡槽，中央悬浮全息案件投影，赛博档案馆氛围，顶部视角，无人物"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_case_file.png",
+    "size": "1440x720",
+    "prompt": "案件卷宗背景：摊开的牛皮纸档案夹，贴满案件照片、证物标签、红线连接与便签，一角有咖啡渍，顶部蓝色全息标题栏，侦探风格，横构图，无文字乱码"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_vote_bg.png",
+    "size": "1440x720",
+    "prompt": "指认投票界面背景：庄重的深蓝紫空间，中央一个发光的全息投票箱与悬浮的选票卡片，背后是巨大的问号光效，红蓝双侧氛围光，横构图"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_clinic_bg.png",
+    "size": "1440x720",
+    "prompt": "心晴诊室背景：温暖治愈的心理咨询室，柔软沙发、绿植、暖黄台灯与漂浮的心形光点，与蓝色全息档案界面融合，横构图，无人物"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_report_bg.png",
+    "size": "1440x720",
+    "prompt": "侦探报告背景：深蓝底上铺开侦探笔记、放大镜、证据照片与红色丝带图钉，右侧一盏复古台灯光晕，横构图"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_hotfeed_bg.png",
+    "size": "1440x720",
+    "prompt": "热搜面板背景：深色数据大屏，滚动的热搜话题流与上升箭头光效，火焰热度图标，知乎蓝色数据网格，赛博HUD风格，横构图"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_map_bg.png",
+    "size": "1440x720",
+    "prompt": "档案局建筑平面图背景：俯视视角的档案局楼层平面，各房间以发光线框勾勒，走廊连接，蓝图风格叠加全息标注点，深蓝底"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_minis_lobby.png",
+    "size": "1440x720",
+    "prompt": "复古游戏厅背景：霓虹灯招牌的游戏机排列，糖果色与蓝紫霓虹交融，中间一台发光的街机屏幕显示狐狸剪影，欢乐氛围，横构图"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/act_t1.png",
+    "size": "1440x720",
+    "prompt": "第一幕转场插画：巨大的锁链缠绕的档案局大门，门上全息横幅发光，一束光从门缝透出，悬疑压迫感，深蓝紫色调，横构图"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/act_t2.png",
+    "size": "1440x720",
+    "prompt": "第二幕转场插画：悬浮的人脑轮廓与发光的记忆芯片芯片插入大脑，记忆碎片如玻璃般漂浮破碎重组，紫色与蓝色光效，超现实风格，横构图"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/act_t3.png",
+    "size": "1440x720",
+    "prompt": "第三幕转场插画：巨大的手机屏幕上热搜榜单如风暴般旋转，词条如刀片飞散，风暴中心一只狐狸剪影屹立不倒，红蓝对抗色，横构图"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_chip.png",
+    "size": "1024x1024",
+    "prompt": "关键道具特写：一枚发光的记忆芯片，芯片表面有细微的电路纹理与一个锁孔图案，悬浮在全息展示台上，蓝色数据流环绕，深色背景"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_badge_wall.png",
+    "size": "1440x720",
+    "prompt": "成就墙背景：深色木质与金属混合的展示墙，七枚空置的圆形徽章凹槽呈金字塔排列，每枚凹槽有柔和的蓝色背光，博物馆陈列感，横构图"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_hud_banner.png",
+    "size": "1440x256",
+    "prompt": "HUD 顶栏横幅：细长的深蓝紫科技边框条，左侧狐狸徽章凹槽，中段信息窗口与数据流纹路，右端信号指示灯，透明感面板，扁平科技风，横长条构图"
+  },
+  {
+    "type": "video",
+    "out": "content/assets/videos/prologue.mp4",
+    "prompt": "监控录像视角：深夜档案局走廊，黑白监控画面带时间码跳动，一只北极狐侦探走进电梯，电梯门关闭，画面突然闪烁雪花噪点，恢复后走廊空无一人只剩一袋掉落的鱼干，悬疑氛围，电影感",
+    "seconds": "8",
+    "size": "720P",
+    "aspect_ratio": "16:9"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/ui_menu_title.png",
+    "size": "1920x1080",
+    "prompt": "游戏主菜单背景：深夜雨后的城市天际线远景，一栋高楼顶层的神秘档案局亮着知乎蓝色霓虹灯光，乌云间透出一轮巨大的冷月，前景是空荡天台的栏杆剪影，画面中央偏上保留大面积暗部空间用于标题排版，一只北极狐剪影立于天台一角望向月亮，电影海报质感，蓝紫色调，悬疑氛围，无文字"
+  }
+]

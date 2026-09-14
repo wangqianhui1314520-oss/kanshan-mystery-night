@@ -1,0 +1,67 @@
+{
+  "owner": "char_04",
+  "version": 3,
+  "blocks": [
+    {
+      "id": "blk_c04_1",
+      "time": "20:45",
+      "layer": "said",
+      "text": "其实是替盐值君代班收快递……顺手赚杯奶茶的那种代班。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c04_1h",
+      "time": "20:46",
+      "layer": "heart",
+      "text": "（心声）代班说出去多不好听……而且答应过知之者老师别乱说，他说会带我把这条目击做成热榜。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c04_2",
+      "time": "21:15",
+      "layer": "said",
+      "text": "21 点 15 分我在快递柜帮人代签。别的……我记不清了。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c04_2h",
+      "time": "21:16",
+      "layer": "heart",
+      "text": "（心声）快递柜那边的影子……毛茸茸的，拎着个袋子？我记不清了，我记不清了，我记不清了。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c04_2hh",
+      "time": "21:15",
+      "layer": "heart",
+      "text": "（心声）想起来了！那个影子有尾巴！尾巴上还挂着工牌！还有……一袋彩虹鳟鱼味鱼干的味道，特别冲！",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c04_4",
+      "time": "21:40",
+      "layer": "said",
+      "text": "代签完我把登记簿放回前台了。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c04_4h",
+      "time": "21:41",
+      "layer": "heart",
+      "text": "（心声）登记簿我放回去了吧？放回去了吧？哎我到底放没放回去？",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": [
+    {
+      "block": "blk_c04_2",
+      "change": "V3 深层修复：目击完整恢复——尾巴、工牌、彩虹鳟鱼味鱼干味（关键证词）",
+      "tamper_point": "tp_02b"
+    },
+    {
+      "block": "blk_c04_4",
+      "change": "新增 21:40 代签收尾细节（登记簿去向成疑）",
+      "tamper_point": null
+    }
+  ]
+}

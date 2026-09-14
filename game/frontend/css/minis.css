@@ -1,0 +1,90 @@
+/* ============================================================
+ * minis.css —— 小游戏层样式（shell 壳 / runner / heart / refute3 / badge）
+ * 零外链：底色沿用深色档案局 HUD + 知乎蓝；手绘/官方素材。
+ * ============================================================ */
+
+/* ---------- 壳顶栏与大厅 ---------- */
+.mini-top { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px;
+  background: linear-gradient(90deg, rgba(0, 132, 255, .1), rgba(13, 20, 38, .92)); flex-wrap: wrap; }
+.mini-top-l { display: flex; align-items: center; gap: 10px; }
+.mini-top-l img { width: 40px; height: 40px; object-fit: contain; }
+.mini-top-l b { display: block; font-size: 15px; letter-spacing: 1px; }
+.mini-top-l span { font-size: 10.5px; color: var(--txt-dim); }
+.mini-top-r { display: flex; align-items: center; gap: 8px; }
+.mini-def { margin: 14px 0 10px; }
+.mini-def h2 { letter-spacing: 2px; }
+.mini-lobby-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0; }
+.mini-card { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 14px; cursor: pointer;
+  border: 1px solid var(--line-dim); border-radius: 12px; background: rgba(10, 16, 32, .7); color: var(--txt); font-family: inherit; transition: all .15s; }
+.mini-card:hover { border-color: rgba(0, 132, 255, .55); box-shadow: 0 0 14px rgba(0, 132, 255, .2); transform: translateY(-2px); }
+.mini-card b { color: var(--cyan); }
+.mini-card em { font-style: normal; font-size: 10.5px; line-height: 1.5; }
+
+/* ---------- M1 看山快跑 ---------- */
+.mini-runner { position: relative; }
+.runner-cv { width: 100%; max-width: 860px; display: block; border-radius: 14px;
+  border: 1px solid rgba(0, 132, 255, .4); background: #070b14; }
+.runner-foot { margin-top: 8px; }
+.runner-ready, .runner-over { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(4, 8, 18, .72); border-radius: 14px; }
+.ro-card { width: min(88%, 460px); padding: 20px 22px; border-radius: 14px; text-align: center;
+  border: 1px solid rgba(0, 132, 255, .45); background: rgba(9, 14, 28, .96); display: flex; flex-direction: column; gap: 10px; }
+.ro-line { color: #ffe9b8; line-height: 1.7; }
+.ro-stats { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: 13px; }
+.ro-stats b { color: var(--cyan); }
+.ro-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* ---------- M2 心声窃听器 ---------- */
+.mini-heart, .mini-refute3, .mini-badge { display: flex; flex-direction: column; gap: 10px; }
+.mh-hud, .r3-hud, .mb-hd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mh-card, .r3-card { padding: 16px 18px; border-radius: 12px; border: 1px solid var(--line);
+  background: rgba(10, 16, 32, .75); display: flex; flex-direction: column; gap: 10px; }
+.mh-npc { color: var(--cyan); letter-spacing: 1px; }
+.mh-line { display: block; width: 100%; text-align: left; padding: 12px 14px; margin: 2px 0; cursor: pointer;
+  border: 1px solid var(--line-dim); border-radius: 10px; background: rgba(13, 20, 38, .9);
+  color: var(--txt); font-family: inherit; font-size: 13.5px; line-height: 1.6; transition: all .15s; }
+.mh-line:hover:not(:disabled) { border-color: rgba(0, 132, 255, .5); }
+.mh-line.picked { border-color: rgba(0, 229, 168, .6); color: var(--green); }
+.mh-verdict { padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255, 77, 94, .4);
+  background: rgba(255, 77, 94, .06); display: flex; flex-direction: column; gap: 6px; }
+.mh-verdict.ok { border-color: rgba(0, 229, 168, .5); background: rgba(0, 229, 168, .06); }
+.mh-verdict b { color: #ffd7a1; }
+.mh-verdict.ok b { color: #c9ffe9; }
+.mh-final { font-size: 16px; }
+.mh-start { display: flex; gap: 8px; flex-wrap: wrap; }
+.mh-src { font-size: 11px; }
+
+/* ---------- M3 谣言消消乐 ---------- */
+.r3-grid { display: flex; flex-direction: column; gap: 5px; user-select: none; }
+.r3-row { display: flex; gap: 5px; padding: 0; border: none; background: none; }
+.r3-cell { flex: 1; min-height: 62px; padding: 5px 4px; border-radius: 9px; cursor: pointer; font-family: inherit;
+  border: 1px solid var(--line-dim); background: rgba(13, 20, 38, .92); color: var(--txt);
+  font-size: 10.5px; line-height: 1.35; text-align: center; transition: transform .1s, border-color .12s; word-break: break-all; }
+.r3-cell:hover { transform: scale(1.04); }
+.r3-cell.sel { border-color: var(--cyan); box-shadow: 0 0 12px rgba(111, 227, 255, .45); transform: scale(1.05); }
+.mk-rumor { border-color: rgba(255, 77, 94, .45); background: rgba(255, 77, 94, .1); color: #ffd7db; }
+.mk-tag { border-color: rgba(0, 132, 255, .45); background: rgba(0, 132, 255, .1); color: #cfe6ff; }
+.mk-ding { border-color: rgba(245, 196, 81, .55); background: rgba(245, 196, 81, .12); color: #ffe9b8; font-weight: bold; }
+.mk-fold { border-color: rgba(130, 150, 189, .4); background: rgba(130, 150, 189, .08); color: var(--txt-dim); }
+.mk-hash { border-color: rgba(0, 229, 168, .5); background: rgba(0, 229, 168, .09); color: #c9ffe9; font-family: var(--mono); }
+.mk-tuna { border-color: rgba(199, 178, 122, .5); background: rgba(199, 178, 122, .1); color: #e8d9b0; }
+.r3-flash { color: #ffe9b8; font-weight: bold; min-height: 18px; }
+.r3-headline { color: var(--txt-dim); }
+.r3-over { position: relative; margin-top: 8px; }
+.r3-over-card { padding: 18px 20px; border-radius: 14px; text-align: center; display: flex; flex-direction: column; gap: 8px; }
+.r3-over-card.s { border: 1px solid rgba(0, 229, 168, .55); background: rgba(0, 229, 168, .07); }
+.r3-over-card.a { border: 1px solid rgba(0, 132, 255, .5); background: rgba(0, 132, 255, .07); }
+.r3-over-card .mh-start { justify-content: center; }
+
+/* ---------- M4 侦探证每日抽 ---------- */
+.mb-ticket { margin-top: 6px; }
+.mb-drawing { color: var(--cyan); letter-spacing: 2px; }
+.mini-entry-row { margin-top: 12px; align-items: center; }
+
+/* ---------- 移动端 ---------- */
+@media (max-width: 860px) {
+  .mini-lobby-grid { grid-template-columns: 1fr 1fr; }
+  .r3-cell { min-height: 48px; font-size: 9.5px; }
+  .runner-cv { height: auto; }
+}

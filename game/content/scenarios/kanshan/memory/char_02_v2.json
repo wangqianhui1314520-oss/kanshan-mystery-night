@@ -1,0 +1,41 @@
+{
+  "owner": "char_02",
+  "version": 2,
+  "blocks": [
+    {
+      "id": "blk_c02_1",
+      "time": "20:30",
+      "layer": "said",
+      "text": "我去档案室找素材——顺便核对一下灵感。欲知后事，且听我慢慢道来。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c02_1h",
+      "time": "20:35",
+      "layer": "heart",
+      "text": "（心声）存证芯片的目录标签其实很有戏剧性……我就看了标题！没看内容！写手看看标题怎么了！",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c02_2",
+      "time": "21:45",
+      "layer": "said",
+      "text": "我上天台吹了吹风。灵感这东西，要风。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c02_2h",
+      "time": "21:50",
+      "layer": "heart",
+      "text": "（心声）天台风大，稿纸差点飞了。这一章要是扑了，我就把『欲知后事』改成『欲知前事』。",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": [
+    {
+      "block": "blk_c02_1",
+      "change": "无篡改：心声层解锁，暴露偷看存证目录的心虚",
+      "tamper_point": null
+    }
+  ]
+}

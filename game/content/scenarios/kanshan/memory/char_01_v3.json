@@ -1,0 +1,74 @@
+{
+  "owner": "char_01",
+  "version": 3,
+  "blocks": [
+    {
+      "id": "blk_c01_1",
+      "time": "20:20",
+      "layer": "said",
+      "text": "我在大厅给大家分了盘点分组，还顺手安抚了新来的 V587 同学——热心前辈而已。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c01_2",
+      "time": "21:00",
+      "layer": "said",
+      "text": "横幅亮起来之后，我全程都在大厅安抚人心，一步都没离开过。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c01_2h",
+      "time": "21:05",
+      "layer": "heart",
+      "text": "（心声）三天了，热榜上没有一个词条是我的。再这样下去，『知之者』就要变成『过气者』了……矩阵_K 不能停。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c01_2hh",
+      "time": "21:12",
+      "layer": "heart",
+      "text": "（心声）看山到底去哪了？他不会是在查『编辑』的事吧……不能慌，一慌就输。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c01_3",
+      "time": "22:00",
+      "layer": "said",
+      "text": "我？22 点在茶水间接了杯水，然后就回大厅了。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c01_3h",
+      "time": "22:00",
+      "layer": "heart",
+      "text": "（心声）后台数据很稳，47 个号都在岗。只要流量酱嘴严，这局稳了。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c01_4",
+      "time": "22:40",
+      "layer": "said",
+      "text": "我提议大家先在大厅眯一会儿，等门开了再报警——先问是不是：报警路上谁看门？",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c01_4h",
+      "time": "22:40",
+      "layer": "heart",
+      "text": "（心声）确认过眼神，在场没有一个查得到矩阵_K。包括那个新来的……V587 怎么总在看我？",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": [
+    {
+      "block": "blk_c01_2",
+      "change": "said 层维持『全程大厅』；新增心声：对看山查『编辑』一事起疑",
+      "tamper_point": "tp_03"
+    },
+    {
+      "block": "blk_c01_3",
+      "change": "said 层维持『接水』；心声暴露『47 个号』矩阵意识",
+      "tamper_point": "tp_03b"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+[
+  {
+    "type": "video",
+    "out": "content/assets/videos/loc_archive.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "poll": 10,
+    "wait": 900,
+    "prompt": "深夜档案室纵深走廊，铁皮柜从地面排到天花板形成透视纵深，顶部感应灯一盏接一盏由远及近亮起，一根悬挂的灯泡轻轻摇晃使整排柜体投影缓慢位移，空气中悬浮的灰尘在光柱中飘飞，第三排有一个抽屉微微开着一条缝，悬疑氛围"
+  },
+  {
+    "type": "video",
+    "out": "content/assets/videos/loc_ac.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "poll": 10,
+    "wait": 900,
+    "prompt": "老旧空调机房，巨大的银色管道纵横交错，主机发出可见的低频震动使管壁上的金属支架轻微颤动，压力表指针缓慢摆动，白色冷雾从阀门处持续渗出并在地面堆积流动，橙色检修灯持续旋转闪烁，工业冷调，悬疑氛围"
+  },
+  {
+    "type": "video",
+    "out": "content/assets/videos/loc_clinic.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "poll": 10,
+    "wait": 900,
+    "prompt": "温馨的心理咨询室一角，柔和的暖光台灯旁一杯热水升起缕缕白气，布艺沙发上的抱枕凹陷尚未回弹，墙上挂着的情绪色卡被风轻轻翻动，窗纱在夜风中缓慢起伏使月光形成流动的光斑，治愈与轻微不安交织的氛围"
+  },
+  {
+    "type": "video",
+    "out": "content/assets/videos/clue_009_surveillance.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "poll": 10,
+    "wait": 900,
+    "prompt": "监控录像视角，黑白低清画质右下角时间码持续跳动到某一刻突然卡顿，画面随即被雪花噪点整段抹去，八分钟的录像像被手抹平的沙滩一样凭空消失，时间轴上的空洞黑条缓缓拉长，老式 CRT 扫描线滚动，极强悬疑感"
+  },
+  {
+    "type": "video",
+    "out": "content/assets/videos/clue_001_banner.mp4",
+    "seconds": 6,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "poll": 10,
+    "wait": 900,
+    "prompt": "档案局大门上方的全息光带由暗到亮骤然启动，蓝色光粒子汇聚成一道流动的横幅光幕并轻微波纹抖动，随后厚重的金属卷帘门缓缓落下封锁出口，门框两侧的警示灯由绿转红持续频闪，一枚鱼干形状的卡通挂坠在光幕的余光里缓缓旋转，冷光压顶的窒息感，赛博悬疑"
+  }
+]

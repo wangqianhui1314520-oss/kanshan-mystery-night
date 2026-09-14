@@ -1,0 +1,20 @@
+{
+  "id": "clue_010",
+  "name": "机房风扇负载曲线",
+  "tier": "limited",
+  "location": "服务器机房",
+  "tags": [
+    "机房",
+    "负载",
+    "21点20分"
+  ],
+  "fact": "21:20 前后服务器组出现持续 4 分钟的异常高负载，像有谁在和时间赛跑地备份，又像在赛跑地删除。",
+  "flavor_hint": "描写风扇的嘶吼与曲线图上的心跳峰，可加弹幕：服务器都急了，你们还在这猜。",
+  "linked_truth_nodes": [
+    "tn_03",
+    "tn_09"
+  ],
+  "unlock_condition": "默认",
+  "fake_of": null,
+  "flaw_id": null
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "剧本元数据模板（复制本目录为你的剧本名，再改这里）",
+  "id": "wucheng_mingan",
+  "title": "雾城谜案",
+  "genre": "社会派悬疑推理",
+  "ip_source": "盐言故事·原创/指定IP名",
+  "player_count_min": 4,
+  "player_count_max": 6,
+  "ai_npc_count": 2,
+  "duration_minutes": 60,
+  "difficulty": "中等",
+  "summary": "雾城连环失踪案：画家阿岚失踪三天，旅店、码头、纱厂之间隐藏着一条走私链。玩家扮演调查者与嫌疑人，还原真相。",
+  "acts": [
+    { "id": "act1", "name": "破冰·雨夜旅店", "stage": "break_ice", "actions_allocated": 6 },
+    { "id": "act2", "name": "搜证·码头", "stage": "investigate", "actions_allocated": 12 },
+    { "id": "act3", "name": "圆桌·对峙", "stage": "round_table", "actions_allocated": 10 },
+    { "id": "act4", "name": "指认·结局", "stage": "accuse", "actions_allocated": 3 }
+  ],
+  "scene_map": {
+    "hotel": { "name": "码头旅店", "type": "base", "clue_pool": ["clue_001", "clue_002"] },
+    "dock": { "name": "七号仓码头", "type": "crime_scene", "clue_pool": ["clue_003", "clue_004"] },
+    "factory": { "name": "雾城纱厂", "type": "hidden", "unlock_condition": "持有线索 clue_003 后开放", "clue_pool": ["clue_005"] }
+  },
+  "difficulty_note": "大型剧本杀可扩展至 12 人：增加 NPC 角色、副线案件、阵营任务。"
+}

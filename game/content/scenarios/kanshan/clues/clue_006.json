@@ -1,0 +1,19 @@
+{
+  "id": "clue_006",
+  "name": "茶水间的两包泡面",
+  "tier": "public",
+  "location": "茶水间",
+  "tags": [
+    "泡面",
+    "茶水间",
+    "流量酱"
+  ],
+  "fact": "泡面桶还温着，两包；配料台上多出一双没拆的筷子——流量酱说他只吃了一包。",
+  "flavor_hint": "描写还冒着热气的泡面与那双多余的筷子，可吐槽『第二包是压惊用的，能量守恒』。",
+  "linked_truth_nodes": [
+    "tn_01"
+  ],
+  "unlock_condition": "默认",
+  "fake_of": null,
+  "flaw_id": null
+}

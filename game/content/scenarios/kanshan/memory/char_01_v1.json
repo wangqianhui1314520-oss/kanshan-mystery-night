@@ -1,0 +1,28 @@
+{
+  "owner": "char_01",
+  "version": 1,
+  "blocks": [
+    {
+      "id": "blk_c01_1",
+      "time": "20:20",
+      "layer": "said",
+      "text": "我在大厅给大家分了盘点分组，还顺手安抚了新来的 V587 同学——热心前辈而已。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c01_2",
+      "time": "21:00",
+      "layer": "said",
+      "text": "横幅亮起来之后，我全程都在大厅安抚人心，一步都没离开过。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c01_3",
+      "time": "22:00",
+      "layer": "said",
+      "text": "我？22 点在茶水间接了杯水，然后就回大厅了。",
+      "integrity": "edited"
+    }
+  ],
+  "diff_from_prev": []
+}

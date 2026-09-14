@@ -1,0 +1,15 @@
+/* Visible feedback for deterministic search and opinion state. */
+.hf-signals { margin: 14px 0; padding: 16px; border: 1px solid #45628a; border-radius: 12px; background: #101d32; color: #e5efff; }
+.hf-signals header { display: flex; justify-content: space-between; gap: 12px; }
+.hf-signals header span, .hf-signals p { color: #b9cce4; font-size: 12px; }
+.hf-signal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.hf-signal { min-width: 0; display: grid; gap: 6px; }
+.hf-signal > span { font-size: 13px; }
+.hf-signal strong { font-size: 24px; color: #9dc8ff; }
+.hf-signal small { font-size: 12px; color: #b9cce4; }
+.hf-signal meter { width: 100%; height: 12px; }
+.hf-post-signals { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; margin: 8px 0; color: #e4edfa; }
+.search-next-hint { margin: 14px 0; padding: 14px; border: 1px solid #5489bf; border-radius: 12px; background: #13243d; color: #e5efff; }
+.search-next-hint p { margin: 8px 0; }
+.search-next-hint small { display: block; color: #b9cce4; margin-top: 10px; }
+@media(max-width: 420px) { .hf-signals { padding: 12px; } .hf-signal-grid { gap: 8px; } .hf-signal strong { font-size: 21px; } }

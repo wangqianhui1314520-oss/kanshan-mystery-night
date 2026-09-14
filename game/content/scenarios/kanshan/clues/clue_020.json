@@ -1,0 +1,19 @@
+{
+  "id": "clue_020",
+  "name": "彩蛋碎片四·修仙世界日报",
+  "tier": "hidden",
+  "location": "档案室",
+  "tags": [
+    "剧中剧",
+    "日报",
+    "碎片"
+  ],
+  "fact": "《修仙世界日报》头版：『今日热点：宗门热搜被水妖刷屏，辟谣需出示对应灵根证书』——剧情照进现实，现实照进剧情。",
+  "flavor_hint": "描写日报排版与本局热搜面板的相似度高到离谱，可加弹幕：这作者是不是卧底在我们中间。",
+  "linked_truth_nodes": [
+    "tn_egg"
+  ],
+  "unlock_condition": "evidence:clue_018",
+  "fake_of": null,
+  "flaw_id": null
+}

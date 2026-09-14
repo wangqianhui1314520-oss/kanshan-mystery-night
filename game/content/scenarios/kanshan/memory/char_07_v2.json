@@ -1,0 +1,41 @@
+{
+  "owner": "char_07",
+  "version": 2,
+  "blocks": [
+    {
+      "id": "blk_c07_1",
+      "time": "20:50",
+      "layer": "said",
+      "text": "我去仓库领了点打印纸，21 点前就回来了，前台一直有路人甲帮着看。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c07_2",
+      "time": "21:47",
+      "layer": "said",
+      "text": "我 21 点 47 发现门禁异常，立刻在系统里留言了。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c07_2h",
+      "time": "21:41",
+      "layer": "heart",
+      "text": "（心声）最高权限令牌……上报？报错了怎么办？得罪了领导怎么办？万一是我看错了呢？『建议关注』——这四个字显得我好聪明，可我好怂。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c07_3",
+      "time": "22:00",
+      "layer": "said",
+      "text": "官方流程我都走了。请问还有其他可以帮您？",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": [
+    {
+      "block": "blk_c07_2",
+      "change": "said 层：『21:47 立刻』实为 21:40 发现、纠结 7 分钟后才留言",
+      "tamper_point": "tp_05"
+    }
+  ]
+}

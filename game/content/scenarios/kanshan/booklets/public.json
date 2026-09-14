@@ -1,0 +1,57 @@
+{
+  "id": "public",
+  "name": "公共剧本 · 看山失踪夜",
+  "role_kind": "public",
+  "faction": "",
+  "public_title": "全员同一份 · 不含秘密",
+  "covers": {
+    "A": {
+      "title": "公共本 · 开场",
+      "you_are": "周五盘点夜。求真档案局被全息横幅锁死：【不出真相，不出此门】。21:00 封控时八人在场；23:00 确认无法解除后，门外的特聘调查员被系统特许入内——门对其余人仍锁。",
+      "tonight": "21:00 首席侦探刘看山进档案室核对最后一柜，之后再未出现。现场无脚印、无搏斗。监控画面在 21:07–21:15 被局长级账号 KS-000 挖空。记忆芯片是另一套东西：它存的是目击存证；热度工具改的是存证，不是监控原片。",
+      "impressions": [],
+      "task": "公开只问三件事：看山去哪了；谁改了记忆；谁在带热搜的节奏。破冰只许认识彼此；搜证才许翻现场。",
+      "never_say": "公共本没有秘密。个人页上的事对别人不可见。",
+      "play_hints": {
+        "prefer_actions": ["chat"],
+        "search_locations": [],
+        "search_keywords": [],
+        "chat_style": "",
+        "avoid": [],
+        "must_not": ["把别人的闭卷当公共情报宣读"]
+      }
+    },
+    "B": {
+      "title": "公共本 · 第二幕提醒",
+      "you_are": "同一局里的人。口供开始和心声打架。",
+      "tonight": "记忆修复与开导已解锁。被改过的那段，不一定是你自愿忘的。",
+      "impressions": [],
+      "task": "对照口供和心声。污染对照：圈出被植入的句子。不要用没修出来的记忆指认。",
+      "never_say": "公共本仍不写任何人的把柄。",
+      "play_hints": {
+        "prefer_actions": ["chat", "skill"],
+        "search_locations": [],
+        "search_keywords": [],
+        "chat_style": "",
+        "avoid": [],
+        "must_not": ["把未解锁的心声层当证据"]
+      }
+    },
+    "C": {
+      "title": "公共本 · 第三幕提醒",
+      "you_are": "热搜开了。热度会带偏指认。",
+      "tonight": "舆论和证据同时结算。指认须交证据卡，不是交嗓门。",
+      "impressions": [],
+      "task": "反打水军或被水军吞没。终局投票。阵营到复盘才公开。",
+      "never_say": "公共本不写终局隐藏选项的含义。",
+      "play_hints": {
+        "prefer_actions": ["vote"],
+        "search_locations": [],
+        "search_keywords": [],
+        "chat_style": "",
+        "avoid": [],
+        "must_not": ["无证据卡强行结案"]
+      }
+    }
+  }
+}

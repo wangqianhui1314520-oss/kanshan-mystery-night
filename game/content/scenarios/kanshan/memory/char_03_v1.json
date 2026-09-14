@@ -1,0 +1,28 @@
+{
+  "owner": "char_03",
+  "version": 1,
+  "blocks": [
+    {
+      "id": "blk_c03_1",
+      "time": "21:00",
+      "layer": "said",
+      "text": "横幅亮起来的时候，我正在茶水间泡面。#泡面无罪#",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c03_2",
+      "time": "21:00",
+      "layer": "said",
+      "text": "我 21 点到 22 点一直在茶水间泡面陪聊，谁来了我都记得。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c03_3",
+      "time": "22:00",
+      "layer": "said",
+      "text": "回大厅的路上？啥也没看见。",
+      "integrity": "edited"
+    }
+  ],
+  "diff_from_prev": []
+}

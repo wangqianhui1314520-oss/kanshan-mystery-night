@@ -1,0 +1,6 @@
+tools/.env
+.env
+*.key
+data/
+__pycache__/
+content/scenarios/gen_*/

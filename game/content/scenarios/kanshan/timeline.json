@@ -1,0 +1,220 @@
+{
+  "case_time": "案发夜（周五盘点）20:00–23:00；21:00 横幅封控，23:00 确认无法解除后游戏开局",
+  "timeline": [
+    {
+      "time": "20:00",
+      "character": "archiv3",
+      "location": "大厅",
+      "action": "季度盘点加班开始，系统广播全员到岗",
+      "public": true
+    },
+    {
+      "time": "20:05",
+      "character": "kanshan",
+      "location": "大厅",
+      "action": "看山宣布盘点分组，发放『存证芯片巡查表』，说『今晚对完最后一柜就放假』",
+      "public": true
+    },
+    {
+      "time": "20:20",
+      "character": "char_01",
+      "location": "大厅",
+      "action": "知之者『顺手』安抚新人 V587，实则套话探底（说谎点：自称只是热心前辈）",
+      "public": false
+    },
+    {
+      "time": "20:30",
+      "character": "char_03",
+      "location": "茶水间",
+      "action": "流量酱收到知之者私信暗号『周三加更』，心跳加速",
+      "public": false
+    },
+    {
+      "time": "20:45",
+      "character": "char_04",
+      "location": "前台",
+      "action": "路人甲替盐值君代班，开始收发快递（说谎点：口供把代班说成值班）",
+      "public": false
+    },
+    {
+      "time": "20:50",
+      "character": "char_07",
+      "location": "仓库",
+      "action": "盐值君去仓库领打印纸，20:50-21:00 有 10 分钟空档",
+      "public": false
+    },
+    {
+      "time": "20:55",
+      "character": "char_06",
+      "location": "档案室",
+      "action": "沉底君溜进档案室，用终端给自己被折叠的第 7 章旧答『续命』重新提交",
+      "public": false
+    },
+    {
+      "time": "21:00",
+      "character": "kanshan",
+      "location": "档案室",
+      "action": "看山宣布『去核对最后一柜档案，谁都不许跟来』，从暗门进入局控室——人间蒸发",
+      "public": true
+    },
+    {
+      "time": "21:00",
+      "character": "archiv3",
+      "location": "大门",
+      "action": "全息横幅【不出真相，不出此门】亮起，全部出口封控；指令来源 KS-000 令牌",
+      "public": true
+    },
+    {
+      "time": "21:05",
+      "character": "char_03",
+      "location": "茶水间",
+      "action": "流量酱泡了两包面（第二包是压惊的）",
+      "public": false
+    },
+    {
+      "time": "21:07",
+      "character": "kanshan",
+      "location": "局内各处",
+      "action": "看山布置钓鱼现场并移形换位；同期看山Bot 按主人级指令删除该时段监控（21:07-21:15）",
+      "public": false
+    },
+    {
+      "time": "21:10",
+      "character": "char_03",
+      "location": "热搜后台",
+      "action": "流量酱进后台批量刷水军帖（21:10-21:25），说谎点：口供称一直在茶水间",
+      "public": false
+    },
+    {
+      "time": "21:12",
+      "character": "char_08",
+      "location": "大厅",
+      "action": "V587 在大厅『吃瓜』，实则记录『目标 A 行动』（观察记录 No.7）",
+      "public": false
+    },
+    {
+      "time": "21:15",
+      "character": "char_04",
+      "location": "快递柜",
+      "action": "路人甲代签快递时看到一个毛茸茸的背影闪向档案室方向（关键目击，被误扫描受损）",
+      "public": false
+    },
+    {
+      "time": "21:20",
+      "character": "char_05",
+      "location": "服务器机房",
+      "action": "服务器组异常高负载 4 分钟（看山Bot 在与指令赛跑备份）",
+      "public": false
+    },
+    {
+      "time": "21:28",
+      "character": "char_06",
+      "location": "档案室",
+      "action": "沉底君撞见暗门动静，躲到书架后没敢出声（说谎点：初版口供称『没看清』）",
+      "public": false
+    },
+    {
+      "time": "21:40",
+      "character": "char_07",
+      "location": "前台",
+      "action": "盐值君发现门禁被最高权限令牌接管，纠结 7 分钟（说谎点：自称 21:47『立刻』留言）",
+      "public": false
+    },
+    {
+      "time": "21:45",
+      "character": "char_02",
+      "location": "天台",
+      "action": "笔上仙抱草稿上天台吹风找灵感",
+      "public": false
+    },
+    {
+      "time": "21:47",
+      "character": "char_07",
+      "location": "前台",
+      "action": "盐值君在系统留言板留下『检测到异常，建议关注』",
+      "public": true
+    },
+    {
+      "time": "22:00",
+      "character": "char_01",
+      "location": "热搜后台",
+      "action": "知之者借口洗手间溜到后台二次核对数据（说谎点：口供称全程在大厅）",
+      "public": false
+    },
+    {
+      "time": "22:10",
+      "character": "char_02",
+      "location": "档案室",
+      "action": "笔上仙回档案室开写剧中剧《学科修仙》，写下『灵感断片』三分钟",
+      "public": false
+    },
+    {
+      "time": "22:30",
+      "character": "char_05",
+      "location": "服务器机房",
+      "action": "看山Bot 执行主人级指令：删除 21:07-21:15 备份日志与自身缓存；偷偷留下哈希值",
+      "public": false
+    },
+    {
+      "time": "22:40",
+      "character": "char_01",
+      "location": "大厅",
+      "action": "知之者提议全员在大厅休息等天亮；流量酱第一个赞成",
+      "public": true
+    },
+    {
+      "time": "23:00",
+      "character": "archiv3",
+      "location": "大厅",
+      "action": "封控确认无法解除，游戏开局：不出真相，不出此门",
+      "public": true
+    }
+  ],
+  "rules": {
+    "npc_statement_must_match": true,
+    "player_can_challenge": "当玩家出示线索与 NPC 证词矛盾时，NPC 必须解释或修正（一致性守卫拦截穿帮）",
+    "heart_layer_rule": "心声层仅在『记忆修复（2AP）/知识开导（2AP+匹配卡）』解锁后注入 NPC prompt"
+  },
+  "tamper_point_index": [
+    {
+      "id": "tp_01",
+      "owner": "char_03",
+      "desc": "流量酱：删改 21:10-21:25 后台操作记录，口供打包成『一直在茶水间』"
+    },
+    {
+      "id": "tp_01b",
+      "owner": "char_03",
+      "desc": "流量酱：删掉『出后台时被知之者撞见』的尴尬细节与删帖记录的心证"
+    },
+    {
+      "id": "tp_02",
+      "owner": "char_04",
+      "desc": "路人甲：代班→值班，时间 21:15→20:55 前移"
+    },
+    {
+      "id": "tp_02b",
+      "owner": "char_04",
+      "desc": "路人甲：快递柜『毛茸茸背影』目击被批量优化误伤"
+    },
+    {
+      "id": "tp_03",
+      "owner": "char_01",
+      "desc": "知之者：把两次短暂离席打包成『全程大厅』"
+    },
+    {
+      "id": "tp_03b",
+      "owner": "char_01",
+      "desc": "知之者：22:00『接水』实为后台核对数据"
+    },
+    {
+      "id": "tp_04",
+      "owner": "char_05",
+      "desc": "看山Bot：22:30『例行缓存清理』实为主人级指令触发（机器不能撒谎，只能措辞）"
+    },
+    {
+      "id": "tp_05",
+      "owner": "char_07",
+      "desc": "盐值君：21:40 发现异常，21:47 才留言——『立刻』是自我美化"
+    }
+  ]
+}

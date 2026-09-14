@@ -1,0 +1,81 @@
+{
+  "owner": "char_03",
+  "version": 3,
+  "blocks": [
+    {
+      "id": "blk_c03_1",
+      "time": "21:00",
+      "layer": "said",
+      "text": "横幅亮起来的时候，我正在茶水间泡面。#泡面无罪#",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c03_2",
+      "time": "21:10",
+      "layer": "said",
+      "text": "21 点 10 分……我、我去后台看了眼数据，很快，就五分钟！",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c03_2h",
+      "time": "21:12",
+      "layer": "heart",
+      "text": "（心声）只有五分钟！发完就走！知之者说了这不算受贿，算资源置换……可我的手为什么在抖。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c03_4",
+      "time": "21:25",
+      "layer": "said",
+      "text": "出后台的时候，我好像碰掉了人家一个杯子。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c03_4h",
+      "time": "21:26",
+      "layer": "heart",
+      "text": "（心声）还有路人甲的芯片……我只是想删我自己的记录，工具怎么把他 21:15 的目击也扫掉了？！这就是所谓的『批量优化』吗？！",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c03_3",
+      "time": "22:00",
+      "layer": "said",
+      "text": "回大厅的路上？啥也没看见。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c03_3h",
+      "time": "22:01",
+      "layer": "heart",
+      "text": "（心声）删帖记录、操作日志……我都用热度管理工具清理过了。清理过了。清理过了。（重要的事说三遍）",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c03_5",
+      "time": "22:40",
+      "layer": "said",
+      "text": "知之者提议先睡，我第一个赞成——我太需要睡一觉了。#裸辞式入睡#",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c03_5h",
+      "time": "22:41",
+      "layer": "heart",
+      "text": "（心声）他要是敢把我供出去，我就把聊天记录挂出来。等等——先想想我们俩谁更怕。",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": [
+    {
+      "block": "blk_c03_4",
+      "change": "新增 21:25 碰杯细节与心声：暴露误伤路人甲芯片",
+      "tamper_point": "tp_01"
+    },
+    {
+      "block": "blk_c03_5",
+      "change": "新增 22:40 站队与互咬预案心声",
+      "tamper_point": null
+    }
+  ]
+}

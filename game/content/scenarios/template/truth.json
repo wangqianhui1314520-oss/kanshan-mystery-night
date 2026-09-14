@@ -1,0 +1,40 @@
+{
+  "$schema": "真相表模板：凶手、动机、手法、伏笔链，是裁判 Agent 与裁决器的判定依据",
+  "truth_summary": "雾城纱厂厂长赵四利用画家阿岚的画作夹带走私颜料中的违禁品；阿岚发现真相后被囚禁于七号仓地下。",
+  "culprit": {
+    "character": "npc_001",
+    "name": "赵四（雾城纱厂厂长）",
+    "crime": "非法囚禁 + 走私",
+    "motive": "阿岚的画作被发现用于走私夹带，为防止泄密而囚禁",
+    "method": "以写生名义骗阿岚至码头，扣画囚人；用'闹鬼'传言阻止外人靠近七号仓",
+    "evidence_chain": ["truth_001", "truth_002", "truth_003"]
+  },
+  "truth_nodes": [
+    {
+      "id": "truth_001",
+      "name": "走私链",
+      "desc": "颜料管中夹带违禁品，由纱厂货车运出",
+      "proof_clues": ["clue_003", "clue_005"],
+      "npc_witness": ["char_002"]
+    },
+    {
+      "id": "truth_002",
+      "name": "囚禁地点",
+      "desc": "七号仓地下室红门内",
+      "proof_clues": ["clue_001", "clue_004"],
+      "npc_witness": []
+    },
+    {
+      "id": "truth_003",
+      "name": "幕后主使",
+      "desc": "赵四是主谋，手下为纱厂工人",
+      "proof_clues": ["clue_004", "clue_005"],
+      "npc_witness": ["char_002"]
+    }
+  ],
+  "ending": {
+    "perfect": "玩家指认赵四 + 动机（走私泄密）+ 手法（画作夹带/囚禁）全部命中",
+    "partial": "指认赵四但动机或手法错误（真相达成度 60-99%）",
+    "wrong": "指认错误角色（赵四逃脱，真相以复盘形式揭晓）"
+  }
+}

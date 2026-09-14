@@ -1,0 +1,19 @@
+{
+  "id": "clue_023",
+  "name": "看山Bot 自爆截图（伪造）",
+  "tier": "fake",
+  "location": "服务器机房",
+  "tags": [
+    "Bot",
+    "截图",
+    "自爆"
+  ],
+  "fact": "『Bot 内部截图：已按指令处置看山』——署名工整得像排版印刷；而看山Bot 绝不说谎，也从不使用表情包以外的图片。",
+  "flavor_hint": "描写截图里过分工整的『自爆』二字与弹幕的集体质疑，可加弹幕：Bot 要能自爆我把机房吃了。",
+  "linked_truth_nodes": [
+    "tn_09"
+  ],
+  "unlock_condition": "默认",
+  "fake_of": "clue_013",
+  "flaw_id": null
+}

@@ -1,0 +1,182 @@
+[
+  {
+    "_layer": "scene",
+    "_note": "地点氛围层：替换 frontend/js/data.js 中 loc_*.img，挂载点 map.js:100 search-panel .scene-head",
+    "type": "video",
+    "out": "content/assets/videos/loc_reception.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "深夜档案局前台固定机位微动长镜头，弧形接待台上的台灯缓慢呼吸般明暗，背景徽标墙的知乎蓝霓虹轻微频闪，一盆仙人掌旁摊开的访客登记簿被中央空调的风吹动纸角，画面中的大屏上有一串像秒表样的数字持续跳动，空无一人，悬疑喜剧氛围"
+  },
+  {
+    "_layer": "scene",
+    "type": "video",
+    "out": "content/assets/videos/loc_desk.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "侦探工位的静态特写 slowly push in，台灯暖光里的浮尘缓缓飘动，软木案件板上的便签被微风掀起一角，桌上摊着一张揉皱又展开的草稿纸边缘轻轻颤动，一袋敞口的鱼干零食旁阳光般的暖光缓慢移动，无人，悬疑氛围"
+  },
+  {
+    "_layer": "scene",
+    "type": "video",
+    "out": "content/assets/videos/loc_teahouse.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "深夜茶水间，桌上一碗刚泡好的泡面腾腾升起白色热气并缓缓消散，旁边另一桶泡面完好未动，一双未拆封的一次性筷子孤零零放在配料台，饮水机指示灯缓慢闪烁并冒出一串气泡，墙上便利贴被风轻拂，暖黄灯光轻微摇曳，喜剧生活气息"
+  },
+  {
+    "_layer": "scene",
+    "_note": "★资产缺口：当前复用 scene_desk_kanshan.png",
+    "type": "video",
+    "out": "content/assets/videos/loc_locker.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "深夜快递柜区域，一排金属智能柜中有一个格口的红色未取件指示灯持续闪烁，冷白色灯带在金属柜面上反射出缓慢移动的光，地面瓷砖上映出柜体倒影轻微晃动，角落有一个被遗弃的空保温箱结着冷霜，冷蓝与暖黄混光，悬疑氛围"
+  },
+  {
+    "_layer": "scene",
+    "type": "video",
+    "out": "content/assets/videos/loc_monitor.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "老式监控室俯拍，一排 CRT 监视器的扫描线缓缓向下滚动，其中一块屏幕布满雪花噪点并间歇性闪烁，控制台上的指示灯群此起彼伏地明灭，一把空转椅在风扇的作用下极缓慢地自转，冷蓝色调，悬疑氛围"
+  },
+  {
+    "_layer": "scene",
+    "type": "video",
+    "out": "content/assets/videos/loc_server.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "服务器机房内景，一排排机柜的蓝色与绿色状态灯高频闪动，散热风扇高速旋转带出轻微气流使散落的网线缓缓摆动，一台未被关闭的工作站屏幕上有数据瀑布持续滚动，冷雾从空调出风口缓慢溢出，冷蓝色调，紧张悬疑氛围"
+  },
+  {
+    "_layer": "scene",
+    "_note": "★资产缺口：当前复用 scene_desk_kanshan.png",
+    "type": "video",
+    "out": "content/assets/videos/loc_archive.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "深夜档案室纵深走廊，铁皮柜从地面排到天花板形成透视纵深，顶部感应灯一盏接一盏由远及近亮起，一根悬挂的灯泡轻轻摇晃使整排柜体投影缓慢位移，空气中悬浮的灰尘在光柱中飘飞，第三排有一个抽屉微微开着一条缝，悬疑氛围"
+  },
+  {
+    "_layer": "scene",
+    "type": "video",
+    "out": "content/assets/videos/loc_hotfeed.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "热搜运营控制室，巨大的数据大屏上话题词条瀑布流持续向下滚动，多条热度柱状图此起彼伏地升降且呈现不自然的整齐节奏，环形指示灯带旋转流动，无人操作的工位上多台工作站屏幕同步刷新，赛博 HUD 风格，冷蓝色调"
+  },
+  {
+    "_layer": "scene",
+    "_note": "★资产缺口：当前复用 scene_desk_kanshan.png",
+    "type": "video",
+    "out": "content/assets/videos/loc_ac.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "老旧空调机房，巨大的银色管道纵横交错，主机发出可见的低频震动使管壁上的金属支架轻微颤动，压力表指针缓慢摆动，白色冷雾从阀门处持续渗出并在地面堆积流动，橙色检修灯持续旋转闪烁，工业冷调，悬疑氛围"
+  },
+  {
+    "_layer": "scene",
+    "type": "video",
+    "out": "content/assets/videos/loc_roof.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "深夜高楼天台，远处城市霓虹天际线缓慢呼吸般明灭，护栏边的夜风卷动地上一只空零食包装袋不断翻滚，云层快速掠过月亮使地面光影忽明忽暗，锈迹斑斑的出入口铁门缓缓晃动发出微响，月光与城市光污染交融，电影感构图"
+  },
+  {
+    "_layer": "scene",
+    "_note": "★资产缺口：当前复用 scene_desk_kanshan.png",
+    "type": "video",
+    "out": "content/assets/videos/loc_clinic.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "温馨的心理咨询室一角，柔和的暖光台灯旁一杯热水升起缕缕白气，布艺沙发上的抱枕凹陷尚未回弹，墙上挂着的情绪色卡被风轻轻翻动，窗纱在夜风中缓慢起伏使月光形成流动的光斑，治愈与轻微不安交织的氛围"
+  },
+
+  {
+    "_layer": "clue",
+    "_note": "线索证据层 S 级：需先给 frontend/js/data.js 的 clues 加 media 字段并在 bag.js clue-detail 挂载 <video loop muted>",
+    "type": "video",
+    "out": "content/assets/videos/clue_001_banner.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "档案局大门上方的全息光带由暗到亮骤然启动，蓝色光粒子汇聚成一道流动的横幅光幕并轻微波纹抖动，随后厚重的金属卷帘门缓缓落下封锁出口，门框两侧的警示灯由绿转红持续频闪，一枚鱼干形状的卡通挂坠在光幕的余光里缓缓旋转，冷光压顶的窒息感，赛博悬疑"
+  },
+  {
+    "_layer": "clue",
+    "type": "video",
+    "out": "content/assets/videos/clue_009_surveillance.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "监控录像视角，黑白低清画质右下角时间码持续跳动到某一刻突然卡顿，画面随即被雪花噪点整段抹去，八分钟的录像像被手抹平的沙滩一样凭空消失，时间轴上的空洞黑条缓缓拉长，老式 CRT 扫描线滚动，极强悬疑感"
+  },
+  {
+    "_layer": "clue",
+    "type": "video",
+    "out": "content/assets/videos/clue_005_hotcurve.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "数据大屏上一条热度曲线像秒表一样以整齐的阶梯状一格一格向上跳升，节奏机械地纪律严明如同有人在按表发帖，柱状图与词条榜同步刷新，霓虹蓝紫数据流向下坠落，屏幕冷光反射在空荡的操作台上，赛博 HUD 风格，不自然的人工感"
+  },
+  {
+    "_layer": "clue",
+    "type": "video",
+    "out": "content/assets/videos/clue_010_fanload.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "服务器机柜特写，散热风扇突然加速到狂转并发出可见的气流感，负载曲线在监视器上猛然冲出一个持续四分钟的高原尖峰，绿色状态灯瞬间转为高频红闪，机柜门的金属面板轻微共振，冷雾被气流卷起，紧张到喘不过气的节奏"
+  },
+  {
+    "_layer": "clue",
+    "type": "video",
+    "out": "content/assets/videos/clue_006_noodles.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "茶水间桌面特写，一桶泡面还冒着腾腾热气，旁边第二桶泡面完好未动地立着，配料台上一双没拆封的一次性筷子孤零零横放，热气缓缓上升消散在暖黄灯光里，画面安静却有第二双筷子的荒诞幽默感，喜剧悬疑"
+  },
+  {
+    "_layer": "clue",
+    "_note": "伪造线索：视频的噪点/低帧率质感天然服务于『这张图是假的』",
+    "type": "video",
+    "out": "content/assets/videos/clue_026_ghostfigure.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "低清门禁抓拍监控视角，一个穿着黑衣的模糊人影在机房门口一闪而过，画面布满均匀分布的马赛克噪点并带着明显放大过度的涂抹痕迹，帧率低且不连贯地跳帧，异常画面像是被人为拼贴上去的，强烈的伪造感与破绽感"
+  },
+  {
+    "_layer": "clue",
+    "_note": "伪造线索：两段截取同一场雨，是可被玩家视频逐帧比对的破绽，戏剧性最强",
+    "type": "video",
+    "out": "content/assets/videos/clue_025_rain.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "夜间窗玻璃特写，雨点密集地斜打在玻璃上并向下流淌形成雨痕，窗外远景是一栋亮着值班灯的办公楼，窗玻璃脏污且有细小水渍，雨势稳定而持续 形成可被反复比对的画面，冷调路灯的长条反光，悬疑氛围"
+  },
+  {
+    "_layer": "clue",
+    "type": "video",
+    "out": "content/assets/videos/clue_011_icepack.mp4",
+    "seconds": 4,
+    "size": "720P",
+    "aspect_ratio": "16:9",
+    "prompt": "打开的保温箱内部俯拍，一只已经化成水的空冰袋瘫软在角落并结着白色冷霜，冷白雾气缓缓溢出并在打开的一瞬间向外流动，箱体底部有一张被水浸湿卷边的空白便签纸随气流轻微颤动，旁边快递柜的红色未取件灯隔着画面持续闪烁，冷寂的悬疑感"
+  }
+]

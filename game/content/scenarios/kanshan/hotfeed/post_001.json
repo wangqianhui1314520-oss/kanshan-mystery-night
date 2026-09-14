@@ -1,0 +1,12 @@
+{
+  "id": "post_001",
+  "round": 1,
+  "title": "#看山失踪#",
+  "body": "官方口径：档案局今晚例行盘点，首席侦探 21 点进档案室核对档案后失联，目前全员原地待命。",
+  "author_mask": "官方",
+  "is_fake": false,
+  "clue_ref": null,
+  "topic_tag": "看山",
+  "heat_delta": 10,
+  "humor_tag": "玩梗"
+}

@@ -1,0 +1,240 @@
+/* ============================================================
+ * ux.css —— 体验层样式：三态占位 / 首屏引导 / 微交互 / 响应式 / 可访问性
+ * 规约：只做增量增强与变量集中，不覆盖既有布局；所有动效 ≤300ms，
+ *       并统一尊重 prefers-reduced-motion。
+ * ============================================================ */
+
+.ai-status-card { border: 1px solid #445477; border-radius: 12px; padding: 12px; margin: 12px 0; text-align: left; color: #dbe6fa; background: #101b30; }
+.ai-status-card strong { margin-right: 12px; }
+.ai-status-card p { font-size: 13px; line-height: 1.6; margin: 8px 0; overflow-wrap: anywhere; }
+.ai-status-button { white-space: normal; font-size: 12px; max-width: 150px; }
+/* ---------- 焦点可见（键盘可达性） ---------- */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--blue-2);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* 鼠标点击不显示焦点环，键盘 Tab 才显示 */
+:where(a, button, input, select, textarea, [tabindex]):focus:not(:focus-visible) { outline: none; }
+
+/* ---------- 动效偏好：全局降级为瞬时 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- 1. 按钮 / 可点元素的按压反馈（微交互） ---------- */
+.btn, .rb-btn, .chip.pick, .hf-buy, .hf-refute-all, .hf-chip, .hf-send,
+.cs-search-btn, .cs-kw, .seg button, .nav-item, .act-bar .nav-item, .bet-opt, .voice-mic {
+  transition: background-color .18s ease, border-color .18s ease, color .18s ease, transform .12s ease, box-shadow .18s ease;
+}
+.btn:active:not(:disabled),
+.rb-btn:active, .chip.pick:active, .seg button:active,
+.nav-item:active, .bet-opt:active:not(:disabled) { transform: translateY(1px) scale(.985); }
+.btn:hover:not(:disabled) { transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: translateY(0) scale(.97); }
+
+/* 由 span/div 升级为原生 button 的亲和格子（键盘可达） */
+button.hf-side-item, button.cs-kw {
+  width: 100%; text-align: left; font: inherit; font-size: 11px;
+  appearance: none; -webkit-appearance: none;
+}
+button.hf-side-item { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+button.cs-kw { width: auto; display: inline-block; }
+
+/* 触摸目标 ≥44px（移动端） */
+@media (max-width: 768px) {
+  .act-bar .nav-item, .btn.sm, .rb-btn, .chip.pick, .seg button, .hf-arrow {
+    min-height: 44px;
+    display: inline-flex; align-items: center;
+  }
+  .rb-btn { padding: 4px 10px; }
+  .chip.pick { min-height: 36px; }
+  input, textarea, select { font-size: 16px; }   /* 防 iOS 自动缩放 */
+}
+
+/* ---------- 2. HUD 数字变化动效 ---------- */
+.ux-num { display: inline-block; font-family: var(--mono); font-size: 12px; }
+.ux-num.pop { animation: uxnumpop .24s ease-out; }
+@keyframes uxnumpop {
+  0% { transform: translateY(-3px) scale(1.28); filter: brightness(1.6); }
+  100% { transform: none; filter: none; }
+}
+
+/* ---------- 3. 事件流 / 列表新条目进场动画 ---------- */
+.cs-bubble, .banner, .toast { animation: uxin .22s ease-out both; }
+@keyframes uxin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.clue-card, .kc-card, .hf-card, .fish-card, .photo-card, .mem-item, .hf-side-item {
+  animation: uxcardin .26s ease-out both;
+}
+@keyframes uxcardin { from { opacity: 0; transform: translateY(8px) scale(.99); } to { opacity: 1; transform: none; } }
+
+/* ---------- 4. Toast 轻量化与层位置（避开底栏/安全区） ---------- */
+.toast-zone { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); right: max(18px, env(safe-area-inset-right, 0px)); }
+.toast { backdrop-filter: blur(8px); border-radius: 10px; line-height: 1.5; }
+.toast.kind.loading { border-color: var(--line); }
+.objective-cta { margin: 10px 0 2px; min-height: 34px; box-shadow: 0 4px 14px rgba(0,132,255,.22); }
+
+/* ---------- 5. 三态占位（空 / 加载中 / 错误） ---------- */
+.ux-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  text-align: center; padding: 30px 22px; margin: 10px 0;
+  border: 1px dashed var(--line-dim); border-radius: 14px;
+  background: linear-gradient(180deg, rgba(13, 20, 38, .55), rgba(10, 16, 32, .3));
+  color: var(--txt-dim); grid-column: 1 / -1;
+}
+.ux-state.dense { padding: 18px 16px; margin: 6px 0; border-radius: 10px; }
+.ux-state .uxs-art { display: block; line-height: 1; }
+.ux-state .uxs-glyph { font-style: normal; font-size: 34px; color: #2c4472; letter-spacing: 4px; }
+.ux-state .uxs-title { color: var(--txt); font-size: 14px; letter-spacing: 1px; }
+.ux-state .uxs-desc { font-size: 12.5px; line-height: 1.75; max-width: 46ch; margin: 0; }
+.ux-state .uxs-btn { margin-top: 2px; }
+.ux-state.error { border-color: rgba(255, 77, 94, .45); background: linear-gradient(180deg, rgba(255, 77, 94, .08), rgba(10, 16, 32, .3)); }
+.ux-state.error .uxs-glyph { color: var(--red); }
+.ux-state.error .uxs-title { color: #ffc9cf; }
+.ux-state.loading { border-style: solid; border-color: var(--line); }
+.ux-state.loading .uxs-title { color: var(--blue-2); }
+
+.uxs-spin {
+  display: block; width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid rgba(0, 132, 255, .22); border-top-color: var(--blue);
+  animation: uxspin .8s linear infinite;
+}
+@keyframes uxspin { to { transform: rotate(360deg); } }
+
+/* 全屏/区块级加载遮罩（视图切换期间的轻量骨架） */
+.ux-busy {
+  position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center;
+  background: rgba(7, 11, 20, .45); backdrop-filter: blur(2px); pointer-events: none;
+}
+.ux-busy .uxs-spin { width: 30px; height: 30px; }
+
+/* ---------- 6. 顶部引擎状态标签（/api/health 驱动） ---------- */
+.rb-btn.engine-btn { gap: 6px; cursor: pointer; }
+.rb-btn.engine-btn .eng-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #4a5c85; box-shadow: 0 0 0 3px rgba(74, 92, 133, .18); }
+.rb-btn.engine-btn.ok { color: #bffee3; border-color: rgba(0, 229, 168, .5); }
+.rb-btn.engine-btn.ok .eng-dot { background: #00e5a8; box-shadow: 0 0 0 3px rgba(0, 229, 168, .18); animation: engpulse 2.4s ease-in-out infinite; }
+.rb-btn.engine-btn.warn { color: #ffd9a1; border-color: rgba(255, 182, 72, .5); }
+.rb-btn.engine-btn.warn .eng-dot { background: #ffb648; box-shadow: 0 0 0 3px rgba(255, 182, 72, .18); }
+.rb-btn.engine-btn.offline { color: #a9bcdf; border-color: rgba(130, 150, 189, .45); }
+.rb-btn.engine-btn.offline .eng-dot { background: #5b6b8d; box-shadow: 0 0 0 3px rgba(91, 107, 141, .16); }
+.rb-btn.engine-btn.pending .eng-dot { animation: pulse 1s infinite; }
+.rb-btn.engine-btn:hover { border-color: var(--blue); color: #fff; }
+@keyframes engpulse { 50% { opacity: .45; } }
+
+/* 行动处理中的顶栏进度条 */
+.ux-busybar { position: fixed; left: 0; right: 0; top: 30px; height: 2px; z-index: 40; overflow: hidden; pointer-events: none; }
+.ux-busybar i { display: block; height: 100%; width: 36%;
+  background: linear-gradient(90deg, transparent, var(--blue-2), transparent);
+  animation: uxbusy .6s ease-in-out infinite; }
+@keyframes uxbusy { 0% { transform: translateX(-100%); } 100% { transform: translateX(360%); } }
+
+/* ---------- 7. WS 断线 / 重连反馈条 ---------- */
+.ux-conn {
+  position: fixed; left: 50%; transform: translateX(-50%); top: 32px; z-index: 65;
+  display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px;
+  font-size: 12px; letter-spacing: .5px; white-space: nowrap; max-width: 92vw;
+  border: 1px solid rgba(255, 182, 72, .5); color: #ffd9a1;
+  background: rgba(60, 40, 10, .92); backdrop-filter: blur(6px);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .45);
+}
+.ux-conn.offline { border-color: rgba(255, 77, 94, .5); color: #ffc9cf; background: rgba(64, 16, 22, .92); }
+.ux-conn .uxs-spin { width: 12px; height: 12px; border-width: 2px; border-top-color: #ffb648; }
+.ux-conn button { border: none; background: rgba(255, 255, 255, .12); color: inherit; border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 11px; font-family: inherit; }
+.ux-conn button:hover { background: rgba(255, 255, 255, .22); }
+
+/* 章节目标进度：让首局玩家随时知道还差几步 */
+.objective-progress { position: relative; height: 6px; margin-top: 10px; border-radius: 99px; overflow: hidden; background: rgba(86,112,164,.22); }
+.objective-progress i { display:block; height:100%; border-radius:inherit; background: linear-gradient(90deg,var(--blue),#00e5a8); transition: width .25s ease; }
+.objective-progress span { position:absolute; right:0; top:8px; font-size:10px; color:var(--txt-dim); }
+
+/* ---------- 8. 首屏新手引导 ---------- */
+.ux-guide { position: fixed; inset: 0; z-index: 95; }
+.ug-dim { position: absolute; inset: 0; background: rgba(3, 6, 14, .72); backdrop-filter: blur(1.5px); }
+.ug-spot {
+  position: absolute; border-radius: 12px; pointer-events: none; z-index: 1;
+  border: 2px solid var(--blue-2); box-shadow: 0 0 0 9999px rgba(3, 6, 14, .72), 0 0 22px rgba(0, 132, 255, .5);
+  animation: ugspot .3s ease-out;
+}
+@keyframes ugspot { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
+
+.ug-card {
+  position: absolute; z-index: 2; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(92vw, 420px); padding: 20px 22px 16px; border-radius: 16px; text-align: left;
+  border: 1px solid var(--line); background: linear-gradient(165deg, rgba(14, 20, 39, .98), rgba(8, 12, 24, .99));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .62), 0 0 30px rgba(0, 132, 255, .16);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ug-card.floating { transform: none; }
+.ug-hd { display: flex; align-items: center; justify-content: space-between; }
+.ug-tag { font-size: 11px; letter-spacing: 2px; color: var(--blue-2); }
+.ug-step { font-size: 11px; color: var(--txt-dim); }
+.ug-card h3 { font-size: 16.5px; line-height: 1.5; color: #fff; letter-spacing: .5px; margin: 0; }
+.ug-desc { margin: 0; font-size: 13px; line-height: 1.85; color: #cfdcf6; }
+.ug-dots { display: flex; gap: 6px; }
+.ug-dot { width: 22px; height: 4px; border: none; border-radius: 2px; background: #24365e; cursor: pointer; padding: 0; }
+.ug-dot.on { background: var(--blue); box-shadow: 0 0 8px rgba(0, 132, 255, .6); }
+.ug-ft { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; }
+.ug-ft-r { display: flex; gap: 8px; }
+.ugfade-enter-active, .ugfade-leave-active { transition: opacity .2s ease; }
+.ugfade-enter-from, .ugfade-leave-to { opacity: 0; }
+
+/* 引导入口按钮（顶栏） */
+.rb-btn.guide-btn { cursor: pointer; }
+.rb-btn.guide-btn:hover { color: #fff; border-color: var(--blue); }
+
+/* ---------- 9. 移动端响应式（≤768px：单列 / 抽屉式底栏 / 触摸友好） ---------- */
+@media (max-width: 768px) {
+  /* 顶栏：品牌与状态换行不溢出，其余横向滚动 */
+  .res-bar { height: auto; min-height: 34px; gap: 8px; padding: 5px 10px; flex-wrap: wrap; overflow: visible; }
+  .rb-brand { flex: 1 1 auto; min-width: 0; }
+  .rb-stats { order: 3; width: 100%; flex-wrap: wrap; overflow-x: auto; justify-content: flex-start; padding-bottom: 2px; }
+  .rb-chip, .rb-btn.engine-btn { flex: none; }
+  .rb-actions { gap: 6px; }
+  .rb-btn span.lbl-hide { display: none; }
+  .act-chip { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* 底部动作条：抽屉式滚动词条 + 固定「下一章」 */
+  .act-bar { padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); gap: 8px; }
+  .ab-menus { overflow-x: auto; scrollbar-width: none; }
+  .ab-menus::-webkit-scrollbar { display: none; }
+  .act-bar .nav-item { flex: none; min-width: 66px; justify-content: center; }
+  .act-bar .nav-item span { font-size: 12px; }
+  .btn.act-next { padding: 10px 14px; font-size: 13px; letter-spacing: 1px; }
+  .banner-zone { top: 68px; }
+  .toast-zone { left: 12px; right: 12px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); align-items: stretch; }
+  .toast { max-width: none; }
+  .objective-cta { width: 100%; margin-top: 9px; }
+
+  /* 视图主内容单列；圆桌页由 chat_ref 自己锁视口，这里不强制撑高 */
+  .view { padding: 12px 12px calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .view.cs { padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .hf-grid { display: flex !important; flex-direction: column; }
+  .hf-bottom { flex-wrap: wrap; gap: 6px; }
+  .hf-rail { flex-direction: row !important; overflow-x: auto; }
+  .ug-card { padding: 16px 16px 12px; }
+  .ug-desc { font-size: 12.5px; line-height: 1.8; }
+  .ux-conn { top: 62px; }
+}
+
+@media (max-width: 420px) {
+  .rb-chip i { display: none; }
+  .rb-chip { padding: 1px 6px; }
+  .act-bar .nav-item span { font-size: 11.5px; }
+}
+
+@media (max-width: 768px) {
+  .next-objective { margin: 6px 8px 8px; padding: 10px 12px 18px; border-radius: 12px; }
+  .objective-kicker { font-size: 11px; }
+  .next-objective strong { display:block; font-size: 14px; line-height:1.45; }
+  .dm-task-list { overflow-x:auto; flex-wrap:nowrap; padding-bottom:4px; }
+  .dm-task-list span { flex: 0 0 auto; min-width: 180px; }
+}
+.ux-busybar span{margin-left:8px;color:var(--txt-dim);font-size:11px;letter-spacing:.5px}
+.pacing-hint{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b9d7ff;border-color:rgba(77,168,255,.35);background:rgba(38,93,170,.12)}
+@media (max-width:640px){.pacing-hint{display:none}}

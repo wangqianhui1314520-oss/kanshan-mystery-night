@@ -1,0 +1,21 @@
+{
+  "id": "clue_014",
+  "name": "热搜后台操作记录",
+  "tier": "limited",
+  "location": "热搜后台",
+  "tags": [
+    "后台",
+    "工位号",
+    "21点10分"
+  ],
+  "fact": "后台操作记录：21:10-21:25 存在一轮批量发帖与删帖操作，终端工位号 LC-03——流量酱的固定工位。",
+  "flavor_hint": "描写操作记录精确到秒的机械感，可加弹幕：工位号都实名制了，跑得了吗。",
+  "linked_truth_nodes": [
+    "tn_04",
+    "tn_05",
+    "tn_07"
+  ],
+  "unlock_condition": "evidence:clue_005",
+  "fake_of": null,
+  "flaw_id": null
+}

@@ -1,0 +1,14 @@
+{
+  "owner": "char_04",
+  "version": 2,
+  "blocks": [
+    { "id": "blk_01", "time": "20:55", "layer": "said", "text": "我在前台替盐值君值班，顺便吃了根火腿肠。", "integrity": "original" },
+    { "id": "blk_02", "time": "21:00", "layer": "said", "text": "我去茶水间泡面，看到流量酱神色慌张地跑过去。", "integrity": "edited" },
+    { "id": "blk_02h", "time": "21:00", "layer": "heart", "text": "（心声）其实我 21 点半才到茶水间，刚才躲在楼梯间偷偷补打卡……", "integrity": "original" },
+    { "id": "blk_03", "time": "21:20", "layer": "said", "text": "回前台的路上听到机房有服务器风扇狂转的声音。", "integrity": "original" },
+    { "id": "blk_04", "time": "21:30", "layer": "said", "text": "（此段记忆缺失）", "integrity": "deleted" }
+  ],
+  "diff_from_prev": [
+    { "block": "blk_02", "change": "said 层：时间 21:30→21:00，'一个背影'→'流量酱'；heart 层暴露真实到点时间", "tamper_point": "tp_02" }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "clue_033",
+  "name": "回声·你自己说过的话",
+  "tier": "limited",
+  "location": "档案局·回声档案",
+  "tags": ["回声", "自证", "看山"],
+  "fact": "档案局把你说的每一句话都存了档。终局时，看山把它们投影在墙上——包括你前后矛盾的那两句。「你说过你信他，也说过你疑他。那么，你现在这句话，又值多少？」",
+  "flavor_hint": "终局 DM 反扑时用玩家原话投影的演出：先播玩家自己的话，再播 DM 的反问。",
+  "linked_truth_nodes": ["btn_01"],
+  "unlock_condition": "echo:contradiction",
+  "auto_grant_on_boss_final": false,
+  "_note": "S1 回声证据机制奖励线索。unlock_condition 为数据层标注，实际发放由 server/engine_driver 在 echo_defend 自证成功时显式调用 EvidenceChain.release('clue_033', actor)。tier=limited 无需门控即可 release。",
+  "fake_of": null,
+  "flaw_id": null
+}

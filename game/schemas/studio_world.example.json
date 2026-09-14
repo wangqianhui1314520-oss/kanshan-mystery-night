@@ -1,0 +1,31 @@
+{
+  "title": "求真档案局 · 热榜机房夜",
+  "logline": "热搜日志被挖走七分钟，锁在机房里的四个人必须在热度把真相淹死之前还原删帖的手。",
+  "genre": "欢乐阵营机制推理 · 快本",
+  "tone": "欢乐外壳 + 信息操纵",
+  "hook": "24 小时热榜机房突然锁死，横幅亮起，监控缺了 21:07-21:14。",
+  "world_rules": [
+    "AI 不得捏造未写入 fact 的证据",
+    "热搜热度升高会淹没真线索",
+    "口供与心声不一致处才是篡改点"
+  ],
+  "surface_truth": "带节奏者指使被裹挟的执行者删除热搜日志，嫁祸目击者",
+  "inner_truth": null,
+  "theme": "热度不是真相",
+  "cast_slots": [
+    {"id": "char_01", "name": "带节奏", "archetype": "热榜操盘手", "faction": "pollution", "comedy_hook": "每句带井号"},
+    {"id": "char_02", "name": "执行者", "archetype": "被拿捏的实习生", "faction": "swayable", "comedy_hook": "说话先道歉"},
+    {"id": "char_03", "name": "目击者", "archetype": "匿名吃瓜", "faction": "truth", "comedy_hook": "我好像看见过"},
+    {"id": "char_04", "name": "记录员", "archetype": "官方小管家", "faction": "truth", "comedy_hook": "您好这边建议"}
+  ],
+  "locations": [
+    {"id": "loc_reception", "name": "前台", "type": "base", "image": "assets/images/scene_reception.png"},
+    {"id": "loc_server", "name": "服务器机房", "type": "crime_scene", "image": "assets/images/scene_server.png"},
+    {"id": "loc_teahouse", "name": "茶水间", "type": "base", "image": "assets/images/scene_teahouse.png"},
+    {"id": "loc_archive", "name": "档案室", "type": "crime_scene", "image": "assets/images/scene_archive.png"},
+    {"id": "loc_monitor", "name": "监控室", "type": "crime_scene", "image": "assets/images/scene_monitor.png"},
+    {"id": "loc_hotfeed", "name": "热搜后台", "type": "crime_scene", "image": "assets/images/scene_hotfeed.png"}
+  ],
+  "comedy_sources": ["腔调错位", "搜错彩蛋", "一眼假热搜"],
+  "safety": "角色均为虚构拟人，不映射真实用户。"
+}

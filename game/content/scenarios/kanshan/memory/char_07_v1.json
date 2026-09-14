@@ -1,0 +1,28 @@
+{
+  "owner": "char_07",
+  "version": 1,
+  "blocks": [
+    {
+      "id": "blk_c07_1",
+      "time": "20:50",
+      "layer": "said",
+      "text": "我去仓库领了点打印纸，21 点前就回来了，前台一直有路人甲帮着看。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c07_2",
+      "time": "21:47",
+      "layer": "said",
+      "text": "我 21 点 47 发现门禁异常，立刻在系统里留言了。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c07_3",
+      "time": "22:00",
+      "layer": "said",
+      "text": "官方流程我都走了。请问还有其他可以帮您？",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": []
+}

@@ -1,0 +1,19 @@
+{
+  "id": "clue_021",
+  "name": "彩蛋碎片五·监天司通缉令",
+  "tier": "hidden",
+  "location": "天台",
+  "tags": [
+    "剧中剧",
+    "通缉令",
+    "碎片"
+  ],
+  "fact": "通缉令残页：『捉妖师追捕偷鱼猫妖，猫妖辩称：不就吃了两条鱼，至于吗？』背面一行小字：『本卷无结局——欲知后事，请看本局复盘。』",
+  "flavor_hint": "描写残页被天台的石头压着、边角起了毛，彩蛋线终点（梗缝合反骨《咪假虎威》，署名见复盘）。",
+  "linked_truth_nodes": [
+    "tn_egg"
+  ],
+  "unlock_condition": "memory:char_02:3",
+  "fake_of": null,
+  "flaw_id": null
+}

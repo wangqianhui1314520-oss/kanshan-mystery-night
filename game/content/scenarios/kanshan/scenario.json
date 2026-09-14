@@ -1,0 +1,198 @@
+{
+  "id": "kanshan",
+  "title": "求真档案局 · 看山失踪夜",
+  "genre": "欢乐阵营机制推理 · AI 原生",
+  "ip_source": "盐言故事×4（灯灯/凉风有信/反骨/六酒，署名见 scripts/credits.md）+ 知乎知识×10（草芽君Psy/杨毅/曾旻Zeng Min/潘幸知/窦泽南/黛西巫巫/王明伟/刀熊说说/胡慎之心理/杨萃先）+ 刘看山 IP（黑客松官方授权）",
+  "player_count_min": 1,
+  "player_count_max": 8,
+  "ai_npc_count": 8,
+  "duration_minutes": 120,
+  "difficulty": "进阶（欢乐外壳+三层真相）",
+  "summary": "周五盘点夜，知乎拟人都市的求真档案局被全息横幅【不出真相，不出此门】锁死，首席侦探刘看山 21:00 进档案室后人间蒸发。8 名被困者口供对不上、监控 21:07–21:15 被挖空、热搜被水军带偏。玩家在 AI DM『系统提示音』的控场下搜证、修复记忆、开导心病、打舆论战——直到发现：你们破的局，正是看山设的局。",
+  "modes": {
+    "main": "主线本：三幕全流程 + 隐藏支线（被删的第 7 章）+ 终极层（指认 DM），内容预算约 120 分钟",
+    "daily": "每日挑战：以当日知乎热榜词条生成 1 个衍生谣言帖与 1 条知识卡组合题，单幕 30 分钟",
+    "quick": "快速局：跳过破冰，直接搜证+心声+舆论，线索池减半、破绽链保留 3 条，约 30 分钟"
+  },
+  "acts": [
+    {
+      "id": "act1",
+      "name": "第一幕·出不去的档案局",
+      "stage": "break_ice",
+      "actions_allocated": 9,
+      "brief": "锁门+失踪开场，横幅梗【不出真相，不出此门】与 DM『叮——系统提示音』人格上线（缝合《不提分就出不去的房间》·灯灯）"
+    },
+    {
+      "id": "act2",
+      "name": "第二幕·心声泄露",
+      "stage": "investigate",
+      "actions_allocated": 12,
+      "brief": "记忆修复解锁 said/heart 双层，篡改点=口供与心声矛盾处（缝合《穿越大明，我被崇祯偷听心声》·凉风有信）"
+    },
+    {
+      "id": "act3",
+      "name": "第三幕·披着虎皮的猫",
+      "stage": "round_table",
+      "actions_allocated": 9,
+      "brief": "舆论战终局：水军/辟谣/热度值，揭面横幅【原来你是披着虎皮的猫】（缝合《咪假虎威》·反骨）"
+    },
+    {
+      "id": "act4",
+      "name": "终局·指认与揭面",
+      "stage": "accuse",
+      "actions_allocated": 3,
+      "brief": "指认结算 + 心晴诊室 + 复盘署名区；破绽≥5 解锁【指认：DM 刘看山】"
+    }
+  ],
+  "scene_map": {
+    "desk_kanshan": {
+      "name": "看山工位",
+      "type": "crime_scene",
+      "clue_pool": [
+        "clue_002",
+        "clue_007",
+        "clue_028"
+      ],
+      "image": "assets/images/scene_desk_kanshan.png"
+    },
+    "server_room": {
+      "name": "服务器机房",
+      "type": "crime_scene",
+      "clue_pool": [
+        "clue_010",
+        "clue_013",
+        "clue_030"
+      ],
+      "image": "assets/images/scene_server.png"
+    },
+    "roof": {
+      "name": "天台",
+      "type": "base",
+      "clue_pool": [
+        "clue_021"
+      ],
+      "image": "assets/images/scene_roof.png"
+    },
+    "reception": {
+      "name": "前台",
+      "type": "base",
+      "clue_pool": [
+        "clue_001",
+        "clue_015"
+      ],
+      "image": "assets/images/scene_reception.png"
+    },
+    "teahouse": {
+      "name": "茶水间",
+      "type": "base",
+      "clue_pool": [
+        "clue_006"
+      ],
+      "image": "assets/images/scene_teahouse.png"
+    },
+    "archive_room": {
+      "name": "档案室",
+      "type": "crime_scene",
+      "clue_pool": [
+        "clue_004",
+        "clue_017",
+        "clue_018",
+        "clue_020"
+      ],
+      "image": "assets/images/scene_archive.png"
+    },
+    "monitor_room": {
+      "name": "监控室",
+      "type": "crime_scene",
+      "clue_pool": [
+        "clue_009",
+        "clue_029"
+      ],
+      "image": "assets/images/scene_monitor.png"
+    },
+    "hotfeed_backstage": {
+      "name": "热搜后台",
+      "type": "crime_scene",
+      "clue_pool": [
+        "clue_005",
+        "clue_012",
+        "clue_014"
+      ],
+      "image": "assets/images/scene_hotfeed.png"
+    },
+    "hvac_room": {
+      "name": "空调机房",
+      "type": "base",
+      "clue_pool": [
+        "clue_003"
+      ],
+      "image": "assets/images/scene_hvac.png",
+      "flavor_note": "环境线索池含『二十年前的大力丸』（欢乐彩蛋，无案情信息）"
+    },
+    "parcel_locker": {
+      "name": "快递柜",
+      "type": "base",
+      "clue_pool": [
+        "clue_011",
+        "clue_016"
+      ],
+      "image": "assets/images/scene_locker.png"
+    },
+    "study_room": {
+      "name": "心晴自习室",
+      "type": "base",
+      "clue_pool": [
+        "clue_008",
+        "clue_019"
+      ],
+      "image": "assets/images/scene_study_room.png",
+      "flavor_note": "搜证动作=抽知识卡（10 张，随机未持有卡），对应 KNOWLEDGE_SYSTEM 心病匹配表"
+    },
+    "director_office": {
+      "name": "局长办公室",
+      "type": "hidden",
+      "unlock_condition": "持有知识卡 kc_10《打造职业发展的金字塔》并按金字塔层级序输入密码（黄金→砖→泥的倒序）",
+      "clue_pool": [],
+      "image": "assets/images/scene_director_office.png",
+      "flavor_note": "演出用隐藏房间：内有看山的策划手稿《钓鱼执法·卷一》与一袋彩虹鳟鱼味鱼干，供终极层揭面演出，不设可搜线索"
+    }
+  },
+  "image_map_note": "立绘 avatar 与场景 image 均出自 content/assets/images/（A 组 asset_gen 管线已生成）；2026-09-13 修复：12 房间 image 一一对应专属场景图，scene_hall.png 保留作大厅兜底。",
+  "system_npcs": [
+    {
+      "id": "archiv3",
+      "name": "Archiv3",
+      "desc": "档案局系统人格，广播腔，负责封控播报与横幅渲染（无角色卡，演出型 NPC）"
+    },
+    {
+      "id": "dm",
+      "name": "系统提示音（=刘看山）",
+      "desc": "AI DM 伪装人格：『叮——』腔调控场；终极层揭面为看山本人声音（见 DM_BOSS_DESIGN）"
+    }
+  ],
+  "condition_grammar": "unlock_condition 语法：『默认』| evidence:<clue_id> | memory:<char_id>:<version> | counsel:<kc_id> | boss:flaw_count>=<n> | chat:keyword_<关键词> | review:credits | echo:contradiction | debate:convinced。\nchat/review 为本剧本新增语法（对话框触发/复盘页触发），echo/debate 为 V5 创新机制语法\n（回声自证触发/法官辩论采信触发，由 server/engine_driver 显式调用 EvidenceChain.release 发放），\nB 组引擎按此实现。",
+  "content_safety": "欢乐向：所有角色为知乎拟人化虚构形象，不映射、不攻击任何真实用户；伪造线索与水军帖均标注 is_fake/fake_of 供引擎与前端识别；引用盐言/知乎知识处保留作者署名（见 scripts/credits.md）。",
+  "difficulty_note": "三幕 + 终局共 33 行动点；破绽链 5 条、彩蛋碎片 5 枚、辟谣目标帖 10 条，全部可离线由引擎判定；AI 只扩写 flavor 不改 fact。"
+  ,"player_protocol": {
+    "public_goal": "和全桌一起还原看山失踪真相",
+    "private_fields": ["阵营目标", "个人秘密", "欢乐任务", "可用技能", "跳反条件"],
+    "fact_labels": ["事实", "推测", "玩笑"],
+    "win_score": ["阵营分", "个人分", "整活分"]
+  },
+  "first_play": {
+    "name": "首局欢乐垂直切片",
+    "player_count": "5 真人 + AI 补位",
+    "duration_minutes": 60,
+    "characters": 5,
+    "clues": 16,
+    "locations": 3,
+    "main_endings": 3,
+    "enabled_mechanics": ["搜证", "一次记忆修复", "一次热搜战", "欢乐值"]
+  },
+  "fun_system": {
+    "currency": "欢乐值",
+    "sources": ["整蛊任务", "角色口头禅", "搜错地点"],
+    "spends": ["热搜投放", "AI锐评", "环境线索"],
+    "min_events_per_act": 2
+  }
+}

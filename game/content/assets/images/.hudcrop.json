@@ -1,0 +1,175 @@
+{
+  "version": 2,
+  "land": [
+    0.072,
+    0.125
+  ],
+  "port": [
+    0.078,
+    0.052
+  ],
+  "files": {
+    "scene_archive.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_corridor.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_desk_kanshan.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_director_office.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_exterior.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_hall.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_hotfeed.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_hvac.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_locker.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_monitor.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_reception.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_roof.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_server.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_study_room.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "scene_teahouse.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "act_t1.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "act_t2.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "act_t3.png": {
+      "out": [
+        1124,
+        552
+      ]
+    },
+    "char_zhizhizhe.png": {
+      "out": [
+        622,
+        1176
+      ]
+    },
+    "char_liuliangjiang.png": {
+      "out": [
+        622,
+        1176
+      ]
+    },
+    "char_lurenjia.png": {
+      "out": [
+        622,
+        1176
+      ]
+    },
+    "char_chendijun.png": {
+      "out": [
+        622,
+        1176
+      ]
+    },
+    "char_bishangxian.png": {
+      "out": [
+        622,
+        1176
+      ]
+    },
+    "char_kanshanbot.png": {
+      "out": [
+        622,
+        1176
+      ]
+    },
+    "char_yanzhijun.png": {
+      "out": [
+        622,
+        1176
+      ]
+    },
+    "char_v587.png": {
+      "out": [
+        622,
+        1176
+      ]
+    },
+    "dm_kanshan_holo.png": {
+      "out": [
+        622,
+        1176
+      ]
+    }
+  }
+}

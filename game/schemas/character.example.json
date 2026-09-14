@@ -1,0 +1,23 @@
+{
+  "id": "char_04",
+  "name": "路人甲",
+  "archetype": "匿名吃瓜群众",
+  "faction": "swayable",
+  "public": {
+    "avatar": "assets/images/char_04.png",
+    "bio": "什么都没看见，什么都听说过。",
+    "speech_style": "我好像看到过……但我记不清了；说话碎、爱加'反正就是那样'"
+  },
+  "secret": {
+    "motive": "当晚替人代班进过机房",
+    "alibi": "声称 21:00 后一直在茶水间",
+    "guilt": "收了一杯奶茶替人刷卡，事后害怕"
+  },
+  "goal": "在不暴露代班记录的前提下洗清自己，可被策反",
+  "memory_versions": [
+    "memory/char_04_v1.json",
+    "memory/char_04_v2.json",
+    "memory/char_04_v3.json"
+  ],
+  "deleted_segments": ["22:40 之后的一段记忆被整段删除（隐藏支线：被删的第 7 章）"]
+}

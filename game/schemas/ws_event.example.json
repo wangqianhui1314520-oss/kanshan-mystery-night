@@ -1,0 +1,13 @@
+{
+  "type": "clue_gained",
+  "session_id": "s_20260913_001",
+  "round": 3,
+  "actor": "player:1",
+  "payload": {
+    "clue_id": "clue_007",
+    "tier": "limited",
+    "name": "被擦掉的监控片段",
+    "text": "你撬开监控室的老旧终端，时间轴在 21:07-21:15 处有一个刺眼空洞……",
+    "danmaku": ["好家伙，直接开审", "这线索我先截个图", " monitoring 室空调给你整感冒了"]
+  }
+}

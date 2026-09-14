@@ -1,0 +1,26 @@
+{
+  "culprit": {
+    "character": "char_01",
+    "name": "带节奏",
+    "crime": "买热搜并指使删日志",
+    "motive": "怕自己的水军矩阵被揭穿",
+    "method": "让执行者在热搜后台用内部工具挖掉七分钟",
+    "accomplices": [{"character": "char_02", "name": "执行者", "role": "被裹挟者", "swayable": true}],
+    "evidence_chain": ["clue_003", "clue_011", "clue_002"]
+  },
+  "truth_nodes": [
+    {"id": "tn_01", "name": "锁门事件", "desc": "大门与横幅同时生效", "proof_clues": ["clue_001", "clue_009"]},
+    {"id": "tn_02", "name": "机房操作", "desc": "七分钟空洞来自机房", "proof_clues": ["clue_003", "clue_004"]},
+    {"id": "tn_03", "name": "目击者矛盾", "desc": "口供与打卡对不上", "proof_clues": ["clue_005", "clue_006"]},
+    {"id": "tn_04", "name": "档案被动过", "desc": "S 盒被借走未还", "proof_clues": ["clue_007", "clue_008"]},
+    {"id": "tn_05", "name": "热搜投放", "desc": "话题与设备同源", "proof_clues": ["clue_011", "clue_010"]},
+    {"id": "tn_06", "name": "主谋身份", "desc": "排班离席对上操盘手", "proof_clues": ["clue_002", "clue_003"]}
+  ],
+  "kc_plan": [
+    {"id": "kc_02", "binds": "char_01"},
+    {"id": "kc_03", "binds": "char_02"},
+    {"id": "kc_01", "binds": "char_03"},
+    {"id": "kc_04", "binds": "char_04"},
+    {"id": "kc_09", "binds": "team_all"}
+  ]
+}

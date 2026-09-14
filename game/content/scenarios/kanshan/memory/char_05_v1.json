@@ -1,0 +1,28 @@
+{
+  "owner": "char_05",
+  "version": 1,
+  "blocks": [
+    {
+      "id": "blk_c05_1",
+      "time": "21:00",
+      "layer": "said",
+      "text": "系统日志：21:00 检测到封控指令，执行方 KS-000 令牌。如实播报完毕。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c05_2",
+      "time": "21:20",
+      "layer": "said",
+      "text": "系统日志：服务器负载异常 4 分钟。原因：未知。我如实播报：未知。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c05_3",
+      "time": "22:30",
+      "layer": "said",
+      "text": "系统日志：22:30 例行缓存清理，完成。",
+      "integrity": "edited"
+    }
+  ],
+  "diff_from_prev": []
+}

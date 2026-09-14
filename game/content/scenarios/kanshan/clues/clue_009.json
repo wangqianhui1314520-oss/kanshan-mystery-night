@@ -1,0 +1,20 @@
+{
+  "id": "clue_009",
+  "name": "被删除的监控时段",
+  "tier": "limited",
+  "location": "监控室",
+  "tags": [
+    "监控",
+    "删除",
+    "21点07分"
+  ],
+  "fact": "监控时间轴 21:07-21:15 存在人为删除痕迹；删除操作账号为 KS-000，权限级别：局长级（全局唯一）。",
+  "flavor_hint": "描写监控室的冷光、时间轴上刺眼的空洞与『删除日志』弹窗的质感，可吐槽机器吃灰程度。",
+  "linked_truth_nodes": [
+    "tn_03",
+    "btn_02"
+  ],
+  "unlock_condition": "默认",
+  "fake_of": null,
+  "flaw_id": null
+}

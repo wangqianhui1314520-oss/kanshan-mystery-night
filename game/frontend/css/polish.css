@@ -1,0 +1,91 @@
+/* Current V31 shell and round-table layout. Loaded after feature styles. */
+:root { --focus-ring: 0 0 0 3px rgba(0,132,255,.28); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+summary:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid var(--cyan); outline-offset: 2px; box-shadow: var(--focus-ring);
+}
+.app { height: 100dvh; min-height: 0; }
+.res-bar { height: auto; min-height: 40px; gap: 12px; padding: 5px 12px; }
+.rb-brand, .rb-actions { flex: none; }
+.rb-stats { min-width: 0; overflow-x: auto; justify-content: flex-start; scrollbar-width: thin; }
+.rb-chip { flex: none; min-height: 26px; padding: 3px 8px; }
+.rb-btn { min-height: 28px; border-radius: 7px; }
+.rb-btn, .cs-send, .cs-chip { transition: border-color .18s ease, background .18s ease; }
+.rb-btn:hover { background: var(--theme-soft, rgba(0,132,255,.16)); }
+.chapter-stage { scrollbar-gutter: stable; }
+.next-objective {
+  border-left-color: var(--theme, #0084ff); border-radius: 12px;
+  background: linear-gradient(100deg, var(--theme-soft, rgba(0,132,255,.16)), #0c1527);
+}
+.next-objective strong { white-space: normal; line-height: 1.5; }
+.next-objective span { white-space: normal; }
+.act-bar { gap: 10px; padding: 8px 12px; box-shadow: 0 -8px 24px rgba(4,8,18,.22); }
+.ab-menus { min-width: 0; }
+.act-bar .nav-item { flex: none; min-height: 38px; border-radius: 8px; }
+.cs-stage { box-shadow: inset 0 0 48px rgba(0,132,255,.08); }
+.cs-feed { border-color: rgba(78,143,244,.18); padding: 8px; }
+.cs-bubble { line-height: 1.7; overflow-wrap: anywhere; }
+.cs-hot { border-color: rgba(78,143,244,.18); background: #0c1322; }
+.cs-hot-item.top { box-shadow: none; }
+.cs-bottom {
+  display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  gap: 12px; padding: 12px; border-color: rgba(78,143,244,.5);
+  background: linear-gradient(135deg, #12203a, #0e1526);
+  box-shadow: 0 -8px 24px rgba(4,8,18,.22);
+}
+.cs-compose-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.cs-compose-group + .cs-compose-group { border-left: 1px solid rgba(78,143,244,.25); padding-left: 12px; }
+.cs-compose-label { flex-basis: 100%; font-size: 12px; color: #b5d4f4; }
+.cs-bottom input, .cs-bottom .pp-whisper { min-width: 100px; min-height: 38px; }
+.cs-bottom input:focus, .cs-bottom select:focus { border-color: var(--blue-2); }
+.cs-send, .cs-chip { min-height: 38px; border-radius: 8px; padding-inline: 14px; }
+.cs-send:not(:disabled):hover { background: #2874e8; }
+.seat-top-actions { display: flex; justify-content: flex-end; margin: -4px 0 6px; }
+
+/* Keep menus out of clipped scrolling regions; only statistics scroll. */
+@media (max-width: 1100px) {
+  .res-bar { flex-wrap: wrap; }
+  .rb-brand { flex: 1 1 auto; }
+  .rb-stats { order: 3; flex: 1 0 100%; flex-wrap: nowrap; }
+}
+@media (max-width: 860px) {
+  .res-bar { padding: 6px 8px; gap: 6px; overflow: visible; }
+  .rb-brand { flex: 1 0 100%; overflow-x: auto; }
+  .rb-actions { flex: 1 1 100%; flex-wrap: wrap; gap: 4px; }
+  .rb-btn { min-height: 44px; padding: 6px 9px; }
+  .rb-stats { gap: 6px; padding-bottom: 2px; }
+  .rb-chip { min-height: 26px; }
+  .rb-chip i { display: inline; }
+  .rb-more { margin-left: auto; }
+  .rb-more-pop { max-width: calc(100vw - 20px); }
+  .next-objective { margin: 6px 8px 0; display: block; padding: 8px 10px; }
+  .next-objective .objective-kicker { display: block; margin: 0 0 2px; }
+  .next-objective strong { display: block; font-size: 13px; }
+  .next-objective span { display: block; margin-top: 2px; font-size: 11px; }
+  /* The stage scrolls as one document on small screens. The composer stays
+     in that flow so it cannot cover either the scene or chapter controls. */
+  .chapter-stage:has(.cs) { display: block; overflow: auto; }
+  .chapter-stage > .view.cs { height: auto; min-height: 0; overflow: visible; padding: 8px; }
+  .cs-grid { flex: none; overflow: visible; grid-template-columns: minmax(0,1fr); grid-template-rows: auto; gap: 8px; }
+  .cs-rail { min-width: 0; }
+  .cs-rail-ava { min-height: 44px; }
+  .cs-dm { padding: 8px; gap: 8px; }
+  .cs-dm-ava { width: 44px; height: 44px; }
+  .cs-stage { flex: none; height: clamp(220px, 58vw, 320px); min-height: 0; }
+  .cs-seat { width: 44px; height: 44px; }
+  .cs-feed { max-height: 220px; min-height: 72px; }
+  .cs-hot { max-height: 160px; }
+  .cs-bottom { grid-template-columns: minmax(0,1fr); position: static; padding: 10px; gap: 10px; }
+  .cs-compose-group + .cs-compose-group { border-left: 0; border-top: 1px solid rgba(78,143,244,.25); padding: 10px 0 0; }
+  .cs-bottom input, .cs-bottom .pp-whisper { min-height: 44px; font-size: 16px; }
+  .cs-bottom button { min-height: 44px; }
+  .act-bar { flex-wrap: wrap; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); gap: 6px; }
+  .act-bar .nav-item { min-height: 44px; padding: 7px 10px; }
+  .ab-menus { flex: 1 1 0; }
+  .ab-hint { display: none; }
+  .ab-next { width: 100%; justify-content: flex-end; }
+  .ab-tools-pop { max-width: calc(100vw - 20px); overflow: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rb-btn, .cs-send, .cs-chip { transition: none; }
+}

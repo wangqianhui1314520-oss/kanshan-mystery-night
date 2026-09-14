@@ -1,0 +1,24 @@
+{
+  "$schema": "线索卡模板：存于 clues/，由证据链系统按条件发放。level: public=公开 | limited=限定玩家 | hidden=条件触发",
+  "id": "clue_001",
+  "name": "半张撕碎的字条",
+  "scene": "hotel",
+  "level": "public",
+  "holder": null,
+  "trigger": {
+    "type": "search_action",
+    "condition": "玩家在旅店房间执行搜证，且成功（骰子/行动力判定）"
+  },
+  "content": {
+    "text": "床板夹层里的半张字条：「红门……地下……七号仓」",
+    "ai_detail_prompt": "为这张字条生成 2-3 句发现时的场景细节描写（纸质、墨迹、撕痕），不得新增任何信息"
+  },
+  "links": {
+    "to_characters": ["char_002"],
+    "to_truth_nodes": ["truth_002"],
+    "contradicts": null
+  },
+  "forgery": {
+    "can_forge": false
+  }
+}

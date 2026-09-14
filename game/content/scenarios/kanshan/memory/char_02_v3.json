@@ -1,0 +1,67 @@
+{
+  "owner": "char_02",
+  "version": 3,
+  "blocks": [
+    {
+      "id": "blk_c02_1",
+      "time": "20:30",
+      "layer": "said",
+      "text": "我去档案室找素材——顺便核对一下灵感。欲知后事，且听我慢慢道来。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c02_1h",
+      "time": "20:35",
+      "layer": "heart",
+      "text": "（心声）存证芯片的目录标签其实很有戏剧性……我就看了标题！没看内容！写手看看标题怎么了！",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c02_4",
+      "time": "21:30",
+      "layer": "said",
+      "text": "档案室好像有动静，我以为是猫。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c02_4h",
+      "time": "21:30",
+      "layer": "heart",
+      "text": "（心声）暗门动了一下。毛茸茸的，不是猫——猫没有那么高的个子……算了，当素材记下来。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c02_2",
+      "time": "21:45",
+      "layer": "said",
+      "text": "我上天台吹了吹风。灵感这东西，要风。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c02_2h",
+      "time": "21:50",
+      "layer": "heart",
+      "text": "（心声）天台风大，稿纸差点飞了。这一章要是扑了，我就把『欲知后事』改成『欲知前事』。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c02_5",
+      "time": "22:10",
+      "layer": "said",
+      "text": "（此段记忆缺失）",
+      "integrity": "deleted"
+    }
+  ],
+  "diff_from_prev": [
+    {
+      "block": "blk_c02_4",
+      "change": "新增 21:30 目击：档案室暗门动静，毛茸茸、身高不对劲——关键证人信息",
+      "tamper_point": null
+    },
+    {
+      "block": "blk_c02_5",
+      "change": "22:10-22:13『灵感断片』，醒来多写 800 字（自删草稿，非阴谋）",
+      "tamper_point": null
+    }
+  ]
+}

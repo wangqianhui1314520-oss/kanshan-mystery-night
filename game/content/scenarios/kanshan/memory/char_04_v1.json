@@ -1,0 +1,28 @@
+{
+  "owner": "char_04",
+  "version": 1,
+  "blocks": [
+    {
+      "id": "blk_c04_1",
+      "time": "20:55",
+      "layer": "said",
+      "text": "我 20 点 55 就在前台值班了，一直坐着，没挪窝。反正就是那样。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c04_2",
+      "time": "21:15",
+      "layer": "said",
+      "text": "21 点 15 分？我在前台坐着，什么都没看见。我好像看到过……不对，我没看到。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c04_3",
+      "time": "22:00",
+      "layer": "said",
+      "text": "反正就是那样，我全程都在前台。",
+      "integrity": "edited"
+    }
+  ],
+  "diff_from_prev": []
+}

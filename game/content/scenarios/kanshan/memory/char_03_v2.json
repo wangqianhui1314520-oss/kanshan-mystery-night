@@ -1,0 +1,53 @@
+{
+  "owner": "char_03",
+  "version": 2,
+  "blocks": [
+    {
+      "id": "blk_c03_1",
+      "time": "21:00",
+      "layer": "said",
+      "text": "横幅亮起来的时候，我正在茶水间泡面。#泡面无罪#",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c03_2",
+      "time": "21:10",
+      "layer": "said",
+      "text": "21 点 10 分……我、我去后台看了眼数据，很快，就五分钟！",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c03_2h",
+      "time": "21:12",
+      "layer": "heart",
+      "text": "（心声）只有五分钟！发完就走！知之者说了这不算受贿，算资源置换……可我的手为什么在抖。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c03_3",
+      "time": "22:00",
+      "layer": "said",
+      "text": "回大厅的路上？啥也没看见。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c03_3h",
+      "time": "22:01",
+      "layer": "heart",
+      "text": "（心声）删帖记录、操作日志……我都用热度管理工具清理过了。清理过了。清理过了。（重要的事说三遍）",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": [
+    {
+      "block": "blk_c03_2",
+      "change": "said 层：『一直在茶水间』的 21:10-21:25 是补丁——那 15 分钟在热搜后台",
+      "tamper_point": "tp_01"
+    },
+    {
+      "block": "blk_c03_3",
+      "change": "said 层：删掉『出后台时被知之者撞见』的尴尬细节",
+      "tamper_point": "tp_01b"
+    }
+  ]
+}

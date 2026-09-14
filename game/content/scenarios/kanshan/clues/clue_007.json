@@ -1,0 +1,20 @@
+{
+  "id": "clue_007",
+  "name": "未开封的鱼干罐",
+  "tier": "public",
+  "location": "看山工位",
+  "tags": [
+    "鱼干",
+    "工位",
+    "口味"
+  ],
+  "fact": "工位抽屉里有一罐未开封的鱼干，口味标签：彩虹鳟鱼味。罐身便签：『金枪鱼味的都是异端。——K』",
+  "flavor_hint": "描写那罐被供起来一样的鱼干与异端宣言，可加弹幕：侦探的浪漫就是口味歧视链。",
+  "linked_truth_nodes": [
+    "tn_01",
+    "btn_01"
+  ],
+  "unlock_condition": "默认",
+  "fake_of": null,
+  "flaw_id": null
+}

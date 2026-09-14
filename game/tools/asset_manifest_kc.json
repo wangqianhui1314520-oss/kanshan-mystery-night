@@ -1,0 +1,62 @@
+[
+  {
+    "type": "image",
+    "out": "content/assets/images/card/kc_flame.png",
+    "size": "1024x1024",
+    "prompt": "正方形居中一枚圆形金属徽章特写，深蓝珐琅底、金色细描边、橙色霓虹内光，图案只有一团向上窜的热度火焰与细小火花，扁平厚涂图标，无人物无风景无界面边框"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/card/kc_voice.png",
+    "size": "1024x1024",
+    "prompt": "正方形居中一枚圆形金属徽章特写，深蓝珐琅底、金色细描边、青色霓虹，图案只有重叠的对话气泡与声波弧线，扁平厚涂图标，无人物无风景无界面边框"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/card/kc_work.png",
+    "size": "1024x1024",
+    "prompt": "正方形居中一枚圆形金属徽章特写，深蓝珐琅底、金色细描边、钢蓝高光，图案只有一只合上的公文包与一枚空白工牌剪影，扁平厚涂图标，无人物无风景无界面边框"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/card/kc_focus.png",
+    "size": "1024x1024",
+    "prompt": "正方形居中一枚圆形金属徽章特写，深蓝珐琅底、金色细描边、青蓝霓虹，图案只有同心圆靶心与一枚箭头正中靶心，扁平厚涂图标，无人物无风景无界面边框"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/card/kc_learn.png",
+    "size": "1024x1024",
+    "prompt": "正方形居中一枚圆形金属徽章特写，深蓝珐琅底、金色细描边、薄荷青光，图案只有一本翻开的书和一盏小型台灯，扁平厚涂图标，无人物无风景无界面边框"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/card/kc_burn.png",
+    "size": "1024x1024",
+    "prompt": "正方形居中一枚圆形金属徽章特写，深蓝珐琅底、金色细描边、淡紫霓虹，图案只有一片枯萎的叶子与一截燃尽的蜡烛，扁平厚涂图标，无人物无风景无界面边框"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/card/kc_goal.png",
+    "size": "1024x1024",
+    "prompt": "正方形居中一枚圆形金属徽章特写，深蓝珐琅底、金色细描边、琥珀金光，图案只有一面插在峰顶的小旗，扁平厚涂图标，无人物无风景无界面边框"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/card/kc_bound.png",
+    "size": "1024x1024",
+    "prompt": "正方形居中一枚圆形金属徽章特写，深蓝珐琅底、金色细描边、冰蓝霓虹，图案只有一面盾牌守护着一道柔和的边界光环，扁平厚涂图标，无人物无风景无界面边框"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/card/kc_plan.png",
+    "size": "1024x1024",
+    "prompt": "正方形居中一枚圆形金属徽章特写，深蓝珐琅底、金色细描边、紫罗兰光，图案只有一座发光的三层金字塔结构，扁平厚涂图标，无人物无风景无界面边框"
+  },
+  {
+    "type": "image",
+    "out": "content/assets/images/card/kc_know.png",
+    "size": "1024x1024",
+    "prompt": "正方形居中一枚圆形金属徽章特写，深蓝珐琅底、金色细描边、知乎蓝霓虹，图案只有一颗发光的知识晶体与北极狐剪影轮廓（不是写实狐狸），扁平厚涂图标，无人物无风景无界面边框"
+  }
+]

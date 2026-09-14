@@ -1,0 +1,9 @@
+# 《求真档案局·看山失踪夜》共享依赖（各窗口按需引用，勿在本文件外再建依赖清单）
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+websockets>=12.0
+httpx>=0.27
+pytest>=8.0
+pyyaml>=6.0
+python-dotenv>=1.0  # 从 game/.env 读取知乎凭证（仅本地/部署注入，已被 .gitignore 忽略）

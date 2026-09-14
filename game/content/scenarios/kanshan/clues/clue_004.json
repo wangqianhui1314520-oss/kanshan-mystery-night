@@ -1,0 +1,19 @@
+{
+  "id": "clue_004",
+  "name": "季度经费盘点表",
+  "tier": "public",
+  "location": "档案室",
+  "tags": [
+    "经费",
+    "盘点",
+    "清白"
+  ],
+  "fact": "季度盘点表显示账实相符、无亏空——『卷款跑路』的传闻在钱这一关就对不上。",
+  "flavor_hint": "描写密密麻麻却规整到强迫症舒适的两个数字列，可吐槽『这表格干净得能直接出版』。",
+  "linked_truth_nodes": [
+    "tn_01"
+  ],
+  "unlock_condition": "默认",
+  "fake_of": null,
+  "flaw_id": null
+}

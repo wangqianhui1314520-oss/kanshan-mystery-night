@@ -1,0 +1,3 @@
+# agents/ 运行时产物不入库（C 窗口）
+cache/
+__pycache__/

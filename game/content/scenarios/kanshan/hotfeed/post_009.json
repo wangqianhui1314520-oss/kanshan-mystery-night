@@ -1,0 +1,12 @@
+{
+  "id": "post_009",
+  "round": 2,
+  "title": "#监控出现21:07-21:15空洞#",
+  "body": "技术流放出现场截图：监控时间轴 21:07-21:15 整段消失，删除账号显示 KS-000。这串代号有点东西。",
+  "author_mask": "网友",
+  "is_fake": false,
+  "clue_ref": "clue_009",
+  "topic_tag": "监控",
+  "heat_delta": 8,
+  "humor_tag": "真线索伪装"
+}

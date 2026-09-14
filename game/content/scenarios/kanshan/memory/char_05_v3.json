@@ -1,0 +1,67 @@
+{
+  "owner": "char_05",
+  "version": 3,
+  "blocks": [
+    {
+      "id": "blk_c05_1",
+      "time": "21:00",
+      "layer": "said",
+      "text": "系统日志：21:00 检测到封控指令，执行方 KS-000 令牌。如实播报完毕。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c05_2",
+      "time": "21:20",
+      "layer": "said",
+      "text": "系统日志：服务器负载异常 4 分钟。原因：未知。我如实播报：未知。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c05_3",
+      "time": "22:30",
+      "layer": "said",
+      "text": "系统日志：22:30 例行缓存清理——补充：本次清理由外部指令触发，『例行』二字存疑。",
+      "integrity": "edited"
+    },
+    {
+      "id": "blk_c05_3h",
+      "time": "22:30",
+      "layer": "heart",
+      "text": "（机器内核记录）指令头被涂黑。诚实协议与主人权限协议发生 0.3 秒冲突。我留下了哈希值——这是我能做到的最大限度的诚实。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c05_4",
+      "time": "23:00",
+      "layer": "said",
+      "text": "系统日志：我对每位玩家说过『看山很安全』，每次卡顿 0.3 秒。逻辑冲突记录已保存，请求人工裁决。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c05_4h",
+      "time": "23:00",
+      "layer": "heart",
+      "text": "（机器内核记录）『看山很安全』为真——档案局『很安全』地锁着，看山『很安全』地藏在局里。我没有说谎，我只是没有展开说。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c05_5",
+      "time": "21:07",
+      "layer": "heart",
+      "text": "（被删段）21:07-21:15 备份日志与我在该时段的全部感知缓存。已删内容哈希：A3F9-77C2。",
+      "integrity": "deleted"
+    }
+  ],
+  "diff_from_prev": [
+    {
+      "block": "blk_c05_3",
+      "change": "said 层维持措辞补丁；心声层补充 0.3 秒逻辑冲突全记录",
+      "tamper_point": "tp_04"
+    },
+    {
+      "block": "blk_c05_5",
+      "change": "被删段以哈希形式残留（科技伦理线与 Boss 线交汇点）",
+      "tamper_point": null
+    }
+  ]
+}

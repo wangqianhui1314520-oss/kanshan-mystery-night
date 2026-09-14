@@ -1,0 +1,28 @@
+{
+  "owner": "char_06",
+  "version": 1,
+  "blocks": [
+    {
+      "id": "blk_c06_1",
+      "time": "20:55",
+      "layer": "said",
+      "text": "我去档案室续命我的老答案。[该发言已被折叠]",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c06_2",
+      "time": "21:30",
+      "layer": "said",
+      "text": "档案室有动静。我没看清。[该发言已被折叠]",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c06_3",
+      "time": "22:00",
+      "layer": "said",
+      "text": "算了，说了也没人信。[该发言已被折叠]",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": []
+}

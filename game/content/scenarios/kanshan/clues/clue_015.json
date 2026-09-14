@@ -1,0 +1,19 @@
+{
+  "id": "clue_015",
+  "name": "路人甲的代班打卡原始记录",
+  "tier": "limited",
+  "location": "前台",
+  "tags": [
+    "打卡",
+    "代班",
+    "21点15分"
+  ],
+  "fact": "打卡系统原始记录：21:15 路人甲在快递柜终端完成代签操作——与他『20:55 起一直坐在前台值班』的口供矛盾。",
+  "flavor_hint": "描写打卡机吐出的原始记录条与口供对不上的微妙瞬间，可吐槽『一杯奶茶引发的血案』。",
+  "linked_truth_nodes": [
+    "tn_04"
+  ],
+  "unlock_condition": "memory:char_04:2",
+  "fake_of": null,
+  "flaw_id": null
+}

@@ -1,0 +1,48 @@
+{
+  "owner": "char_08",
+  "version": 2,
+  "blocks": [
+    {
+      "id": "blk_c08_1",
+      "time": "20:20",
+      "layer": "said",
+      "text": "新人报道！第一次见档案局！居然有人失踪！这也太刺激了吧！！",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c08_1h",
+      "time": "20:21",
+      "layer": "heart",
+      "text": "（心声）新人味要足：感叹号多，问题傻，乱点赞。专业术语慎用——刚才差点说出『设备指纹』。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c08_2",
+      "time": "21:12",
+      "layer": "said",
+      "text": "我全程在大厅吃瓜，哪儿都没去！",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c08_2h",
+      "time": "21:12",
+      "layer": "heart",
+      "text": "（心声）观察记录 No.7：目标 A 于 22:00 离席约 4 分钟，方向：热搜后台。（字迹潦草，老司机的手压不住）",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c08_3",
+      "time": "22:00",
+      "layer": "said",
+      "text": "这个梗是什么意思？【已打码】是什么梗？在线等，挺急的！",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": [
+    {
+      "block": "blk_c08_2",
+      "change": "无篡改：心声层解锁——『吃瓜』实为观察记录",
+      "tamper_point": null
+    }
+  ]
+}

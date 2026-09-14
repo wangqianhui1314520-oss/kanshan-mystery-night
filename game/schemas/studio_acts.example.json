@@ -1,0 +1,49 @@
+{
+  "acts": [
+    {
+      "id": "act1",
+      "name": "第一幕·锁死的热榜",
+      "stage": "break_ice",
+      "actions_allocated": 6,
+      "brief": "锁门+七分钟空洞开场，先对话再搜公开线索。",
+      "info_budget": 4,
+      "must_reveal": ["横幅锁门", "监控缺七分钟"],
+      "must_not_reveal": ["主谋就是带节奏", "执行者按下删除"],
+      "player_verbs": ["chat", "search"],
+      "twist_beat": "第一张公开线索证明锁门指令来自楼内",
+      "comedy_beat": "搜错茶水间只摸到过期鱼干",
+      "oh_moment": "热搜突然冒出一条一眼假的失踪辟谣",
+      "dm_notes": "叮——只播报 fact，不点名真凶"
+    },
+    {
+      "id": "act2",
+      "name": "第二幕·被改过的记忆",
+      "stage": "investigate",
+      "actions_allocated": 9,
+      "brief": "记忆修复与开导，said/heart 对质。",
+      "info_budget": 5,
+      "must_reveal": ["目击者打卡矛盾", "档案盒被借走"],
+      "must_not_reveal": [],
+      "player_verbs": ["search", "memory_fix", "counsel"],
+      "twist_beat": "心声揭开执行者被拿捏",
+      "comedy_beat": "记录员官腔到把自己绕进去",
+      "oh_moment": "篡改点自动进证物袋",
+      "dm_notes": "心声未解锁不得泄"
+    },
+    {
+      "id": "act3",
+      "name": "终局·指认",
+      "stage": "accuse",
+      "actions_allocated": 3,
+      "brief": "热搜对质后提交证据卡指认。",
+      "info_budget": 2,
+      "must_reveal": ["投放设备同源"],
+      "must_not_reveal": [],
+      "player_verbs": ["refute", "vote"],
+      "twist_beat": "伪证与真排期对撞",
+      "comedy_beat": "群嘲错指",
+      "oh_moment": "指认结算",
+      "dm_notes": "只演不裁"
+    }
+  ]
+}

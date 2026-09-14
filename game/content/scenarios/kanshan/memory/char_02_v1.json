@@ -1,0 +1,21 @@
+{
+  "owner": "char_02",
+  "version": 1,
+  "blocks": [
+    {
+      "id": "blk_c02_1",
+      "time": "20:30",
+      "layer": "said",
+      "text": "我去档案室找素材——顺便核对一下灵感。欲知后事，且听我慢慢道来。",
+      "integrity": "original"
+    },
+    {
+      "id": "blk_c02_2",
+      "time": "21:45",
+      "layer": "said",
+      "text": "我上天台吹了吹风。灵感这东西，要风。",
+      "integrity": "original"
+    }
+  ],
+  "diff_from_prev": []
+}

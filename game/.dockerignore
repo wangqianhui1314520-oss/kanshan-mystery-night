@@ -1,0 +1,15 @@
+# 凭证红线：绝不打进镜像（部署时密钥走平台环境变量面板）
+.env
+.env.*
+
+# 运行数据与缓存（镜像不带，挂载盘在运行时生成）
+data/
+agents/cache/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.pytest_cache/*
+
+# 本地日志与临时产物
+*.log
+*.mp4

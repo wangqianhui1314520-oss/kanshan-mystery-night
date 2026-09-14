@@ -1,0 +1,21 @@
+{
+  "id": "clue_032",
+  "name": "破绽五·策划签名",
+  "tier": "boss_flaw",
+  "location": "复盘页",
+  "tags": [
+    "复盘",
+    "署名",
+    "策划"
+  ],
+  "fact": "复盘页署名列表的最底下一行小字：『本局由刘看山亲自策划——策划你的策划。』与前端热搜后台《档案局封闭压力测试·策划案》落款互证。",
+  "flavor_hint": "描写复盘页滚到底时那行差点被错过的小字，终局彩蛋（frontend 署名区常驻渲染）。与前端热搜后台《档案局封闭压力测试·策划案》落款互证。",
+  "linked_truth_nodes": [
+    "btn_01"
+  ],
+  "unlock_condition": "review:credits",
+  "auto_grant_on_boss_final": true,
+  "_note_c1": "进入指认幕即 sync review:credits 并发放，保证 vote 前 5/5。",
+  "fake_of": null,
+  "flaw_id": "flavor_5"
+}

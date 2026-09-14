@@ -1,0 +1,20 @@
+{
+  "id": "clue_002",
+  "name": "看山的请假条草稿",
+  "tier": "public",
+  "location": "看山工位",
+  "tags": [
+    "请假条",
+    "字迹",
+    "21点前"
+  ],
+  "fact": "未提交的请假条草稿：『周五盘点后离局，周一回来。别找我。』字迹抖动，落款处画着一条小鱼。",
+  "flavor_hint": "描写纸面上反复涂改的痕迹与那尾画歪的小鱼，可调侃『失踪前先写请假条， fox 的仪式感』。",
+  "linked_truth_nodes": [
+    "tn_01",
+    "btn_01"
+  ],
+  "unlock_condition": "默认",
+  "fake_of": null,
+  "flaw_id": null
+}
