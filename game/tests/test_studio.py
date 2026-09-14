@@ -6,6 +6,7 @@ kanshan 黑名单、空 seed 异常；可选 REST 路由（不存在则 skip）�
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -282,10 +283,22 @@ class TestStudioOptionalApi:
         resp = client.post("/api/studio/generate", json={
             "seed": PRESET_SEEDS[0], "tier": "demo", "use_llm": False,
         })
-        assert resp.status_code == 200
+        # 202 异步受理契约：轮询 /api/studio/jobs/{job_id} 到终态
+        assert resp.status_code == 202, resp.text
         body = resp.json()
         assert body.get("ok") is True
-        job = body.get("job") or {}
+        assert body.get("status") == "running"
+        job_id = body["job_id"]
+        deadline = time.time() + 90
+        job = {}
+        while time.time() < deadline:
+            r = client.get(f"/api/studio/jobs/{job_id}")
+            assert r.status_code == 200, r.text
+            job = r.json()["job"]
+            if job.get("status") in ("ready", "failed"):
+                break
+            time.sleep(0.3)
+        assert job.get("status") == "ready", job
         assert (job.get("gate") or {}).get("ok") is True
         assert str(job.get("id", "")).startswith("gen_")
 

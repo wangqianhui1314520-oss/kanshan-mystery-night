@@ -202,7 +202,7 @@
         const links = (S.evidenceLinks || []).length;
         if (stage === 'break_ice') return [
           { text: '听完 DM 与角色自我介绍', done: chatCount >= 1 },
-          { text: '打开并阅读本幕剧本', done: !!(S.playerBook || S.bookletOpen) },
+          { text: '打开并阅读本幕剧本', done: !!(S.dmBookRead || S.playerBook || S.bookletOpen) },
           { text: '点击「开始搜证」进入现场', done: false }
         ];
         if (a === 1) return [
@@ -225,28 +225,6 @@
         const t = dmTasks.value.find(x => !x.done);
         return t ? t.text : '本幕目标已完成，DM 正在召回全员进入下一环节';
       });
-      /* 当前目标的唯一主入口：让玩家无需在导航中猜下一步。 */
-      const dmAction = computed(() => {
-        const t = dmTasks.value.find(x => !x.done);
-        if (!t) return null;
-        const text = t.text || '';
-        if (/搜查|搜证|现场/.test(text)) return { view: 'map', label: '开始搜证 ▸' };
-        if (/圆桌|对质|汇报|提问/.test(text)) return { view: 'chat', label: '回到圆桌 ▸' };
-        if (/剧本|本幕/.test(text)) return { view: 'chat', label: '打开剧本 ▸' };
-        if (/记忆/.test(text)) return { view: 'memory', label: '修复记忆 ▸' };
-        if (/污染|拼图|证据链/.test(text)) return { view: text.includes('污染') ? 'pollution' : 'evidence', label: text.includes('污染') ? '查看污染对照 ▸' : '整理证据链 ▸' };
-        if (/热搜/.test(text)) return { view: 'hotfeed', label: '核对热搜 ▸' };
-        if (/指认/.test(text)) return { view: 'vote', label: '进入终局指认 ▸' };
-        return null;
-      });
-      const doDmAction = () => {
-        if (!dmAction.value) return;
-        const target = dmAction.value.view;
-        // 目标按钮位于游戏主界面，直接设置视图，避免导航守卫拦截后无任何反馈。
-        if (S.phase === 'play') S.view = target;
-        if (window.Store && window.Store.toast) window.Store.toast(
-          target === 'chat' ? '已打开本幕剧本，请查看圆桌台词。' : '已打开目标页面。', 'good');
-      };
       const dmMini = computed(() => {
         if (S.ended || !window.Minis || S.view === 'mini') return null;
         if (S.act === 1 && S.round === 2 && !S.dmMiniSeen.runner) return { id: 'runner', title: 'DM 插入小游戏：看山快跑', hint: '线索太安静了，先来一局热身，赢取额外行动点。' };
@@ -620,7 +598,7 @@
       boot();
 
       const L = window.Labels;
-      return { ai, aiSeats, aiDecision, S, M, L, hostOpen, goalOpen, hostAdvance, taskCard, openTaskCard, booted, bootMsg, settings, leaveAsk, settingsAdv, askLeave, confirmLeave, wsUrl, actName, flawN, kcOwned, erN, navGo, dossierOpen, joinCode, copyShare, achOpen, helpOpen, aboutOpen, apiForm, saveApi, onModelChange, ACH_IMG, elevatorDone, Store: window.Store, VIEWS: window.VIEWS, CUT_LINES, CASE_BRIEF, caseBrief, caseTitle, chapter, menuItems, utilityItems, cutLine, playSkin, showHeat, showKcards, showFlaw, showZans, rail, railOn, prog, pacingHint, dmTasks, dmNext, dmAction, doDmAction, dmMini, openDmMini, goNextChapter, eng, conn, connText, engineSource, transportSource, recheckEngine, retryConn, guideOpen, replayGuide, guideDone, cutVidErr, audioMuted, toggleAudio, Voice, voiceOut, voiceIn, voiceAuto, toggleVoiceOut, toggleVoiceIn, toggleVoiceAuto, seatBookChars, seatRolePack, showSeatRoles, seatRoles, soulQuiz, SOUL_QUESTIONS, soulOpen, soulPick, soulRetake, soulSkip, soulResult, soulMatchId, VoiceRTC, rtcLive, rtcListen, rtcJoin, rtcLeave, shelfOpen, shelfState, shelfItems, shelfToggle, loadShelf, shelfPlayable, shelfTime, shelfPlay, roomLife, npcPendingName };
+      return { ai, aiSeats, aiDecision, S, M, L, hostOpen, goalOpen, hostAdvance, taskCard, openTaskCard, booted, bootMsg, settings, leaveAsk, settingsAdv, askLeave, confirmLeave, wsUrl, actName, flawN, kcOwned, erN, navGo, dossierOpen, joinCode, copyShare, achOpen, helpOpen, aboutOpen, apiForm, saveApi, onModelChange, ACH_IMG, elevatorDone, Store: window.Store, VIEWS: window.VIEWS, CUT_LINES, CASE_BRIEF, caseBrief, caseTitle, chapter, menuItems, utilityItems, cutLine, playSkin, showHeat, showKcards, showFlaw, showZans, rail, railOn, prog, pacingHint, dmTasks, dmNext, dmMini, openDmMini, goNextChapter, eng, conn, connText, engineSource, transportSource, recheckEngine, retryConn, guideOpen, replayGuide, guideDone, cutVidErr, audioMuted, toggleAudio, Voice, voiceOut, voiceIn, voiceAuto, toggleVoiceOut, toggleVoiceIn, toggleVoiceAuto, seatBookChars, seatRolePack, showSeatRoles, seatRoles, soulQuiz, SOUL_QUESTIONS, soulOpen, soulPick, soulRetake, soulSkip, soulResult, soulMatchId, VoiceRTC, rtcLive, rtcListen, rtcJoin, rtcLeave, shelfOpen, shelfState, shelfItems, shelfToggle, loadShelf, shelfPlayable, shelfTime, shelfPlay, roomLife, npcPendingName };
     },
     template: `
         <!-- 开场覆盖层：封面 → DM 开场 → 领取侦探证（剧本杀标准流程） -->
@@ -947,7 +925,6 @@
           <button v-if="!S.isSpectator" class="btn primary sm script-stage-entry" @click="Store.openRoleScript()">阅读我的剧本 · 第{{ S.act || 1 }}幕</button>
           <div class="objective-kicker">本章目标 · {{ chapter.tag }}</div>
           <strong>{{ dmNext }}</strong>
-          <button v-if="dmAction" class="btn primary sm objective-cta" @click="doDmAction">{{ dmAction.label }}</button>
           <span v-if="!prog.cleared">完成后即可{{ S.act >= 3 ? '进入终局指认' : '进入下一章' }}</span>
           <span v-else>可以查看本章收获并继续推进剧情</span>
           <div class="dm-task-list" aria-label="DM 分步任务">

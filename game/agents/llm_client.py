@@ -39,6 +39,12 @@ _LAST_CALL = {"ts": 0.0}
 _MIN_CALL_INTERVAL = float(os.environ.get("LLM_MIN_INTERVAL", "0"))
 _RETRY_DELAYS = (0.8, 1.6, 3.0, 5.0)
 
+# 出网强制直连（2026-09-14 压测取证）：Windows 注册表系统代理
+# （ProxyEnable=1）会被 urllib 默认继承（getproxies → 注册表），本机代理
+# 对 developer.zhihu.com 的 POST 会返回 401/405/异常秒回，直接导致
+# NPC 聊天全军覆没。LLM 出网一律绕过任何代理直连上游。
+_STRAIGHT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def _post_with_rate_limit(req, timeout: float) -> dict:
     """统一 POST+JSON：本地节流默认关闭；429 快速退避重试（main/zhida 共用）。"""
@@ -47,7 +53,7 @@ def _post_with_rate_limit(req, timeout: float) -> dict:
         if gap < _MIN_CALL_INTERVAL:
             time.sleep(_MIN_CALL_INTERVAL - gap)
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with _STRAIGHT_OPENER.open(req, timeout=timeout) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
             _LAST_CALL["ts"] = time.time()
             return data
@@ -185,10 +191,27 @@ class OpenAICompatProvider(Provider):
     name = "main"
 
     def __init__(self):
+        # 显式凭证锁：设置面板探针等场景直接注入 api_key/base_url/model 后，
+        # 后续 chat() 的 _sync_env() 不得再用进程 env 覆盖（否则面板填的
+        # DeepSeek 等自建端点会被 env 值静默顶替，探针假阳性/连接失败）。
+        self._explicit_creds = False
         self._sync_env()
+
+    def use_credentials(self, api_key: str, base_url: str, model: str) -> None:
+        """注入显式凭证并锁定（此后 _sync_env 不再覆盖实例属性）。"""
+        self.api_key = (api_key or "").strip()
+        self.base_url = (base_url or "").rstrip("/")
+        self.model = (model or "").strip()
+        try:
+            self.timeout = float(os.environ.get("LLM_TIMEOUT") or 60)
+        except ValueError:
+            self.timeout = 60.0
+        self._explicit_creds = True
 
     def _sync_env(self) -> None:
         """会话级 header / 设置面板会晚于进程启动写入 env，每次调用重读。"""
+        if self._explicit_creds:
+            return
         self.api_key = os.environ.get("LLM_API_KEY") or ""
         self.base_url = (os.environ.get("LLM_BASE_URL") or "").rstrip("/")
         self.model = os.environ.get("LLM_MODEL") or ""
@@ -491,7 +514,9 @@ class LLMClient:
             text = p.chat(system, user, temperature=temperature, stream=False)
         except Exception as exc:            # 网络/协议/限额任何异常 → 兜底
             self._note(provider, f"chat 失败已兜底: {exc}")
-            self.last_error = type(exc).__name__
+            # 保留具体原因（如 HTTP Error 401: Unauthorized / 402 欠费），
+            # 供探针与对局诊断把真实失败原因透给用户，而不是只有异常类名。
+            self.last_error = f"{type(exc).__name__}: {exc}"[:200]
             text = fallback_text("generic")
             failed = True
         if not failed and p.name != "mock" and self.cache_enabled:

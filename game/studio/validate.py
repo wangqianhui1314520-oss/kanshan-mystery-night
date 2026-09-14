@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from .paths import BLACKLIST
@@ -185,6 +186,12 @@ def validate_dir(scenario_dir, tier: str = "demo") -> dict:
             continue
         _book_semantic_gate(book, errors)
 
+    # 叙事级闸门（V1/V2/V3）。NARRATIVE_GATE=0 可整体关闭（mutation test 用）。
+    if os.environ.get("NARRATIVE_GATE", "") != "0":
+        _check_timeline_consistency(scenario, truth, timeline, clues, errors, warnings)
+        _check_reachability(scenario, truth, clues, errors, warnings)
+        _check_fake_loop(root, truth, clues, chars, errors, warnings)
+
     # 去重
     errors = list(dict.fromkeys(errors))
     warnings = list(dict.fromkeys(warnings))
@@ -217,3 +224,149 @@ def _book_semantic_gate(book: dict, errors: list[str]) -> None:
         if secret and secret in facts_blob:
             errors.append(_BOOK_LEAK_MSG)
             break
+
+
+# ---------------------------------------------------------------------------
+# 叙事级检查器（V1/V2/V3）。只查「叙事逻辑」，不改结构闸门既有逻辑。
+# 实测基准：content/scenarios/kanshan/（权威主剧本）不得被误伤（0 error）。
+# ---------------------------------------------------------------------------
+
+
+def _check_timeline_consistency(scenario, truth, timeline, clues, errors, warnings) -> None:
+    """V1 时间线一致性（error 级）。
+
+    规则：
+    1. 同一 character 的时间不重叠：按 time 精确相等判定（time 相同且 action
+       相同视为同一事件，不报；time 相同但 action 不同 → error）。
+    2. 每幕时间窗内至少一条事件——仅在 acts 含时间窗字段（time_window 或
+       start_time/end_time）时检查。kanshan 实测 acts 只有 id/name/stage/
+       actions_allocated/brief，无时间窗字段 → 该子项天然跳过。
+    3. 「口供-时间线」交叉点兜底：有 linked_truth_nodes 的线索数 ≥ truth_nodes
+       数（粗粒度）。kanshan 实测 34≥14 通过；不满足仅 warning（避免误伤
+       小体量包，非死局）。
+    """
+    events = timeline.get("timeline") or []
+    # 子项 1：同角色同时刻重叠（action 相同视为同源事件）
+    seen: dict[tuple, dict] = {}
+    for ev in events:
+        who = ev.get("character")
+        when = str(ev.get("time") or "")
+        act_txt = str(ev.get("action") or ev.get("desc") or "")
+        key = (who, when)
+        prev = seen.get(key)
+        if prev is None:
+            seen[key] = {"action": act_txt}
+        elif act_txt != prev["action"]:
+            errors.append(
+                f"NARR-V1: {who} 在 {when} 存在重叠事件（同一时刻只能在一个事件）")
+    # 子项 2：幕时间窗（kanshan 无时间窗字段，自动跳过）
+    for act in scenario.get("acts") or []:
+        win = act.get("time_window")
+        start, end = act.get("start_time"), act.get("end_time")
+        if win:
+            parts = str(win).split("-")
+            if len(parts) == 2:
+                start, end = parts[0].strip(), parts[1].strip()
+        if not (start and end):
+            continue
+        inside = [
+            ev for ev in events
+            if str(start) <= str(ev.get("time") or "") <= str(end)
+        ]
+        if not inside:
+            errors.append(
+                f"NARR-V1: 幕 {act.get('id')} 时间窗 {start}-{end} 内无时间线事件")
+    # 子项 3：交叉点粗兜底
+    tn_count = len(truth.get("truth_nodes") or [])
+    linked = sum(1 for c in clues.values() if c.get("linked_truth_nodes"))
+    if tn_count and linked < tn_count:
+        warnings.append(
+            f"NARR-V1: 口供-时间线交叉点不足（有真相链接的线索 {linked} < 真相节点 {tn_count}）")
+
+
+def _check_reachability(scenario, truth, clues, errors, warnings) -> None:
+    """V2 真相可达性（error 级），宽松可达模型。
+
+    建图：truth_node ←proof_clues← clue ←location(中文场景名)← scene_map 节点。
+    分幕解锁从严会误伤，故 act2 起全部场景视为可达、act1 起点集合不做裁剪——
+    只拦两类死局：
+    a) 真相挂在完全不存在的场景：某节点的全部有效证明线索 location 均不在
+       scene_map 中文名集合 → error。
+    b) 真相零证明线索：proof_clues 为空列表 → error。
+    逐节点 proof 细化（≥2 条）：1 条=warning、0 条=error。REF 段已有
+    proof_min 检查；同一节点已被 REF 报过的（引用不存在的线索）不再重复报。
+    kanshan 实测豁免：tn_08 仅 1 条证明（clue_016），单证规则点由 error
+    降级为 warning，不拦截 gate.ok。
+    """
+    scene_names = {v.get("name") for v in (scenario.get("scene_map") or {}).values()}
+    for node in truth.get("truth_nodes") or []:
+        tn = node.get("id")
+        proofs = node.get("proof_clues") or []
+        existing = [c for c in proofs if c in clues]
+        if not proofs:
+            errors.append(f"NARR-V2: {tn} 零证明线索（真相死局）")
+            continue
+        if not existing:
+            # 全部引用缺失：REF 段已报「clue_pool 引用不存在」，去重不报
+            continue
+        if len(existing) == 1:
+            # kanshan 实测豁免：tn_08 单证合法，降 warning 不拦截
+            warnings.append(f"NARR-V2: {tn} 证明线索仅 1 条（建议 ≥2）")
+        reachable = [
+            c for c in existing if clues[c].get("location") in scene_names
+        ]
+        if not reachable:
+            errors.append(
+                f"NARR-V2: {tn} 真相不可达（证明线索均不在场景节点）")
+
+
+def _check_fake_loop(root: Path, truth, clues, chars, errors, warnings) -> None:
+    """V3 伪证回路与凶手隐瞒（error 级）。
+
+    规则：
+    1. 每个 fake 线索必须「可被真线索戳破」，满足任一即可：
+       a) 存在非 fake 线索与其共享同一个 linked_truth_nodes 成员；
+       b) fake_of 指向一条存在的非 fake 线索（被伪造的原件即戳破者；
+          生成包 mock 快本实测 fake 线索 linked_truth_nodes 为空、仅靠
+          fake_of 关联，故 b 为必要豁免，否则误伤全部生成包）。
+       两者皆缺 → error。
+    2. culprit（truth.culprit.character）必须有隐瞒：scripts/player_book_{cid}.json
+       或 booklets/{cid}.json 的 secrets 非空。文件缺失或无 secrets 键 →
+       warning（kanshan 实测豁免：主剧本无 player_book，booklets/char_XX.json
+       无 secrets 键，故事本结构与生成包不同；生成包的 player_book 存在性
+       已由 BOOK 段既有检查覆盖）。secrets 键存在但为空 → error。
+    """
+    linked_by_tn: dict[str, set] = {}
+    for cid, clue in clues.items():
+        if clue.get("tier") == "fake":
+            continue
+        for tn in clue.get("linked_truth_nodes") or []:
+            linked_by_tn.setdefault(tn, set()).add(cid)
+    for cid, clue in clues.items():
+        if clue.get("tier") != "fake":
+            continue
+        tns = set(clue.get("linked_truth_nodes") or [])
+        shared = any(linked_by_tn.get(tn, {cid}) - {cid} for tn in tns)
+        fo = clue.get("fake_of")
+        fake_of_valid = bool(fo) and fo in clues and clues[fo].get("tier") != "fake"
+        if not (shared or fake_of_valid):
+            errors.append(
+                f"NARR-V3: {cid} 伪证不可戳破（无真线索共享真相节点且 fake_of 缺失）")
+
+    culprit = truth.get("culprit") or {}
+    ccid = culprit.get("character")
+    if ccid and ccid in chars:
+        book = None
+        for rel in (f"scripts/player_book_{ccid}.json", f"booklets/{ccid}.json"):
+            p = root / rel
+            if p.is_file():
+                try:
+                    book = json.loads(p.read_text(encoding="utf-8"))
+                except Exception:  # noqa: BLE001
+                    book = None
+                break
+        if book is None or "secrets" not in (book or {}):
+            # kanshan 实测豁免：主剧本故事本无 secrets 键，降 warning
+            warnings.append(f"NARR-V3: 凶手 {ccid} 故事本无 secrets 字段（建议补齐）")
+        elif not _book_strs(book.get("secrets")):
+            errors.append(f"NARR-V3: 凶手 {ccid} 无隐瞒（secrets 为空）")

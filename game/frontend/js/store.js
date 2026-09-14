@@ -2226,7 +2226,10 @@
   function applyEvent(evt, fromSpeechQueue) {
     const p = evt.payload || {};
     track('events', String(evt.type || 'unknown'));
-    if (p.message_id) {
+    /* message_id 去重只在非播报路径执行：首次到达（WS/REST）登记 seen 并入队，
+       aiSpeechQueue 播报时（fromSpeechQueue=true）必须放行，否则同一条消息
+       会在入口被登记 seen 后、于播报环节被去重拦截 → 消息永久丢失。 */
+    if (p.message_id && !fromSpeechQueue) {
       const key = String(evt.session_id || state.sessionId) + ':' + p.message_id;
       if (socialMessagesSeen.has(key)) return;
       socialMessagesSeen.add(key);
@@ -2362,10 +2365,13 @@
           break;
         }
         if (p.actor_kind === 'player') {
-          /* 乐观回显去重：本地已上屏的同文消息，服务器回执到达时跳过 */
+          /* 乐观回显去重：本地已上屏的同文消息，服务器回执到达时跳过。
+             （2026-09-14 修复：原式引用未定义的 payload.team 会抛
+             ReferenceError → 回执中断 + pendingEcho 不清空 → 玩家消息
+             乐观回显与服务器回执各上屏一遍。p 即回执 payload。） */
           const pd = state.pendingEcho;
           if (mine && pd && pd.text === p.text && Date.now() - pd.at < 15000
-              && pd.team === !!(p.team || payload.team)) {
+              && pd.team === !!(p.team)) {
             state.pendingEcho = null;
             break;
           }
@@ -3160,7 +3166,7 @@
       return cover ? (cover.milestones || []) : [];
     },
     openGoals() { this.hydrateBooklet(); },
-    bookletDismiss() { state.bookletForced = null; state.bookletOpen = false; },
+    bookletDismiss() { state.bookletForced = null; state.bookletOpen = false; if (state.bookletPack || state.playerBook) state.dmBookRead = true; },
     async pickStudioChar(id) {
       id = String(id || '').trim();
       if (!id) return false;

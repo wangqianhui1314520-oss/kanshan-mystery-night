@@ -191,7 +191,10 @@ class ZhihuGateway:
 
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=self.timeout)
+            # trust_env=False（2026-09-14）：不继承系统代理/环境代理，
+            # 知乎开放平台出网一律直连（本机代理曾致 401/405 劫持）。
+            self._client = httpx.AsyncClient(timeout=self.timeout,
+                                             trust_env=False)
         return self._client
 
     async def close(self):
@@ -311,7 +314,7 @@ class ZhihuGateway:
             return self._env(True, "cache", data=cached)
         headers = {"Accept": "application/json"}
         try:
-            with httpx.Client(timeout=self.timeout) as client:
+            with httpx.Client(timeout=self.timeout, trust_env=False) as client:
                 resp = client.get(f"{self.content_base}/story/{work_id}",
                                   headers=headers)
         except httpx.HTTPError as e:
@@ -490,7 +493,7 @@ class ZhihuGateway:
         resp = None
         for attempt in range(4):
             try:
-                with httpx.Client(timeout=self.timeout) as client:
+                with httpx.Client(timeout=self.timeout, trust_env=False) as client:
                     resp = client.post(
                         f"{self.open_base}/v1/chat/completions",
                         json={"model": _OPENAI_MODEL_DEFAULT, "messages": messages,

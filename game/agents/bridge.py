@@ -394,6 +394,7 @@ class AgentRuntime:
         violations = self.guard.check(npc.character, reply, context)
         if violations:
             reply = f"（{npc.character.get('name', '???')}）" + fallback_text("npc_reply")
+            npc.last_reply_kind = "violations"
             self.counters["violations_total"] += 1
         bake = self.stage_machine.bake_check(message)   # 【已打码】彩蛋（引擎确定性）
         if bake:
@@ -404,6 +405,7 @@ class AgentRuntime:
         # chat:keyword_ 条件注入（唤醒词彩蛋 clue_031 链，B 组扩展语法）
         self.evidence.sync_context(chat_keywords=[message.strip()])
         return {"reply": reply, "violations": violations,
+                "reply_kind": getattr(npc, "last_reply_kind", "llm"),
                 "heart_unlocked": npc.heart_unlocked,
                 "bake_banner": bake, "events": self.stage_machine.system_events()}
 

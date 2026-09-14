@@ -117,7 +117,17 @@
       const r = await fetch('/api/ai/test',{method:'POST',headers,body:'{}'});
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || '请求失败');
-      Object.assign(ai,{state:'success',label:'AI 调用成功',provider:j.provider || '知乎直答',detail:'真实请求成功 · '+j.elapsed_ms+'ms'});
+      const prov = j.provider === 'main' ? (j.model || '自建模型(main)') : '知乎直答(zhida)';
+      /* panel_fallback：面板填的凭证连接失败，服务端已回落赛事默认通道——
+         必须如实标红并带出真实错误（key 失效/模型名错/网络），否则用户会误判。 */
+      if (j.panel_fallback) {
+        Object.assign(ai,{state:'failed',label:'面板凭证无效（已回落）',
+          detail:'面板填写的模型连接失败：' + (j.panel_error || '未知错误')
+            + '。探针已回落赛事默认通道（' + prov + '）——请核对面板的 API 地址 / API Key / 模型名。'});
+        return false;
+      }
+      Object.assign(ai,{state:'success',label:'AI 调用成功',provider:prov,
+        detail:'真实请求成功 · ' + j.elapsed_ms + 'ms · 实际通道：' + prov});
       return true;
     } catch(e) {
       Object.assign(ai,{state:'failed',label:'AI 调用失败',detail:String(e.message || e)});

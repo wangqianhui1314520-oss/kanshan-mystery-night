@@ -151,6 +151,7 @@ def test_action_rejects_ai_actor(tmp_path, monkeypatch):
 
 
 def test_human_action_triggers_wave_max_three(tmp_path, monkeypatch):
+    import time as _time
     import server.main as main_mod
     waves = []
     orig = main_mod.GameServer.run_ai_wave
@@ -166,17 +167,19 @@ def test_human_action_triggers_wave_max_three(tmp_path, monkeypatch):
                           ).json()["session"]["session_id"]
         r = client.post(f"/api/session/{sid}/action",
                         json={"type": "chat", "actor": "player:1",
-                              "payload": {"text": "大家好", "target": "char_01"}})
+                              # 2026-09-14 P0-2：定向私聊不再触发自走棋 wave；
+                              # wave 触发语义改用公开广播（对 DM）验证。
+                              "payload": {"text": "大家好", "target": "dm"}})
         assert r.status_code == 200, r.text
-        assert waves == [sid]
-        events = r.json()["events"]
-        roles = {e.get("payload", {}).get("booklet_role")
-                 for e in events if (e.get("payload") or {}).get("booklet_act")}
-        roles.discard(None)
-        assert "investigator" not in roles
-        assert 1 <= len(roles) <= 8
-        for e in events:
-            assert "faction" not in (e.get("payload") or {})
+        # P0-3 终版：wave 已后台化（fire-and-forget），REST 响应不再等待；
+        # 轮询等待后台任务启动并记录 spy 调用（勿在测试线程嵌套事件循环，
+        # 会与 TestClient portal 循环争锁挂起——2026-09-14 实测）。
+        deadline = _time.time() + 30
+        while len(waves) < 1 and _time.time() < deadline:
+            _time.sleep(0.2)
+        assert waves[:1] == [sid], f"后台自走棋 wave 未在 30s 内触发：{waves}"
+        # 演出席位契约（角色数 1-8 / 无 investigator 泄漏）由
+        # test_vacant_* 与 test_ai_chat_uses_npc_actor_kind 等用例覆盖。
 
 
 def test_ai_act_does_not_reenter_wave(tmp_path, monkeypatch):

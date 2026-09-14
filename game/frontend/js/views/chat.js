@@ -82,7 +82,9 @@
         }
         if (chatMode.value === 'team') return m.actor === 'peer' || m.team === true || (m.actor === 'npc' && (!teamMembers.value.length || teamMembers.value.includes(m.char_id))) || (m.actor === 'me' && m.team);
         if (chatMode.value === 'private') return false;
-        return m.actor === 'sys' || m.actor === 'dm' || m.actor === 'npc' || m.actor === 'me' || m.actor === 'peer' || m.aiAct || m.wave;
+        /* DM 播报只进左上「DM 面板」（lastDm 从 S.chat 全量取，不受本过滤影响），
+           不再重复渲染进公共聊天流（2026-09-14 需求：DM 专属框单通道展示）。 */
+        return m.actor === 'sys' || m.actor === 'npc' || m.actor === 'me' || m.actor === 'peer' || m.aiAct || m.wave;
       }));
 
       watch(shown, async () => { await nextTick(); if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight; });

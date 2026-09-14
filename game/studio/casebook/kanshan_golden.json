@@ -1,0 +1,384 @@
+{
+  "source": "D:\\Vibe coding\\知乎黑客松\\game\\content\\scenarios\\kanshan",
+  "generated_at": "2026-09-14T16:54:34+00:00",
+  "stats": {
+    "clues_total": 34,
+    "truth_nodes_total": 14,
+    "timeline_events": 24,
+    "acts_total": 4
+  },
+  "truth_layering": "表层：资深答主『知之者』因流量焦虑堕落为水军头子（矩阵_K），遥控被裹挟的流量酱刷帖删记录、篡改记忆存证；看山Bot 只是执行『主人级指令』的傀儡。里层：整场失踪与封局是刘看山自导自演的钓鱼执法——他假失踪、锁大门、扮系统提示音，钓出记忆编辑产业链，顺便逼 8 个人直面被信息污染的心病。你们破的局，正是看山设的局。",
+  "tier_ratio": {
+    "public": 7,
+    "limited": 11,
+    "hidden": 5,
+    "fake": 6,
+    "boss_flaw": 5
+  },
+  "clue_density": {
+    "tn_01": {
+      "name": "看山失踪之谜",
+      "proof_count": 4,
+      "tier_dist": {
+        "public": 3,
+        "limited": 1
+      }
+    },
+    "tn_02": {
+      "name": "锁门与全息横幅",
+      "proof_count": 2,
+      "tier_dist": {
+        "public": 2
+      }
+    },
+    "tn_03": {
+      "name": "监控删除",
+      "proof_count": 3,
+      "tier_dist": {
+        "limited": 3
+      }
+    },
+    "tn_04": {
+      "name": "记忆芯片编辑",
+      "proof_count": 2,
+      "tier_dist": {
+        "limited": 2
+      }
+    },
+    "tn_05": {
+      "name": "水军带节奏",
+      "proof_count": 3,
+      "tier_dist": {
+        "limited": 2,
+        "public": 1
+      }
+    },
+    "tn_06": {
+      "name": "水军头子真身",
+      "proof_count": 2,
+      "tier_dist": {
+        "limited": 2
+      }
+    },
+    "tn_07": {
+      "name": "被裹挟者",
+      "proof_count": 3,
+      "tier_dist": {
+        "limited": 3
+      }
+    },
+    "tn_08": {
+      "name": "V587 三层身份",
+      "proof_count": 1,
+      "tier_dist": {
+        "limited": 1
+      }
+    },
+    "tn_09": {
+      "name": "科技伦理·被删日志",
+      "proof_count": 2,
+      "tier_dist": {
+        "limited": 2
+      }
+    },
+    "tn_10": {
+      "name": "心病图谱",
+      "proof_count": 2,
+      "tier_dist": {
+        "limited": 1,
+        "hidden": 1
+      }
+    },
+    "tn_egg": {
+      "name": "彩蛋线·被删的第 7 章",
+      "proof_count": 5,
+      "tier_dist": {
+        "hidden": 5
+      }
+    },
+    "btn_01": {
+      "name": "里层·看山设局",
+      "proof_count": 3,
+      "tier_dist": {
+        "boss_flaw": 3
+      }
+    },
+    "btn_02": {
+      "name": "里层·主人级指令链",
+      "proof_count": 4,
+      "tier_dist": {
+        "limited": 2,
+        "boss_flaw": 2
+      }
+    },
+    "btn_03": {
+      "name": "里层·钓鱼目的",
+      "proof_count": 2,
+      "tier_dist": {
+        "limited": 2
+      }
+    }
+  },
+  "fake_evidence_samples": [
+    {
+      "id": "clue_022",
+      "name": "匿名快递单（伪造）",
+      "description": "『匿名快递单：收件人盐值君，内件：记忆编辑器×1』——但前台登记簿显示当晚根本没有这个包裹。",
+      "fake_of": "clue_011"
+    },
+    {
+      "id": "clue_023",
+      "name": "看山Bot 自爆截图（伪造）",
+      "description": "『Bot 内部截图：已按指令处置看山』——署名工整得像排版印刷；而看山Bot 绝不说谎，也从不使用表情包以外的图片。",
+      "fake_of": "clue_013"
+    },
+    {
+      "id": "clue_024",
+      "name": "经费亏空的爆料长图（伪造）",
+      "description": "『内部爆料：档案局经费亏空三百万』长图——与干净的盘点表对不上，且图里表格的行列宽度和局内标准模板不一致。",
+      "fake_of": "clue_004"
+    },
+    {
+      "id": "clue_025",
+      "name": "路人甲的『值班』打卡照（伪造）",
+      "description": "一张 20:55 的值班打卡照——但照片里窗外的雨点和 21:30 的雨一模一样，P 图师傅忘了对天气。",
+      "fake_of": "clue_015"
+    },
+    {
+      "id": "clue_026",
+      "name": "机房『20:45 人影』抓拍（伪造）",
+      "description": "模糊抓拍称 20:45 有人影进机房——该时段机房门禁无任何刷卡记录，且照片噪点分布均匀得像放大三倍的马赛克。",
+      "fake_of": "clue_010"
+    },
+    {
+      "id": "clue_027",
+      "name": "天台勒索纸条（伪造）",
+      "description": "『鱼干在我手里，想要来天台单聊』——字迹圆滚滚地过分可爱，与横幅同属一个字体库渲染。",
+      "fake_of": "clue_007"
+    }
+  ],
+  "voice_dual_layer": [
+    {
+      "char": "char_01",
+      "name": "知之者",
+      "said": "我？22 点在茶水间接了杯水，然后就回大厅了。",
+      "said_integrity": "edited",
+      "heart": "（心声）三天了，热榜上没有一个词条是我的。再这样下去，『知之者』就要变成『过气者』了……矩阵_K 不能停。"
+    },
+    {
+      "char": "char_03",
+      "name": "流量酱",
+      "said": "回大厅的路上？啥也没看见。",
+      "said_integrity": "edited",
+      "heart": "（心声）只有五分钟！发完就走！知之者说了这不算受贿，算资源置换……可我的手为什么在抖。"
+    }
+  ],
+  "act_rhythm": [
+    {
+      "id": "act1",
+      "name": "第一幕·出不去的档案局",
+      "stage": "break_ice",
+      "actions_allocated": 9,
+      "clue_unlocks": 20
+    },
+    {
+      "id": "act2",
+      "name": "第二幕·心声泄露",
+      "stage": "investigate",
+      "actions_allocated": 12,
+      "clue_unlocks": 10
+    },
+    {
+      "id": "act3",
+      "name": "第三幕·披着虎皮的猫",
+      "stage": "round_table",
+      "actions_allocated": 9,
+      "clue_unlocks": 2
+    },
+    {
+      "id": "act4",
+      "name": "终局·指认与揭面",
+      "stage": "accuse",
+      "actions_allocated": 3,
+      "clue_unlocks": 2
+    }
+  ],
+  "act_clue_note": "kanshan 未直接标注幕→线索映射；clue_unlocks 按 unlock_condition 动词归类累计（act1=默认解锁，act2=evidence/memory/counsel，act3=debate/echo，act4=chat/review）",
+  "relations": [
+    {
+      "from": "知之者（真水军头子『矩阵_K』）",
+      "to": "流量酱",
+      "note": "执行者（被裹挟者，可策反）"
+    },
+    {
+      "from": "知之者（真水军头子『矩阵_K』）",
+      "to": "路人甲",
+      "note": "被忽悠自改口供的目击者（被裹挟者，可策反）"
+    },
+    {
+      "from": "知之者",
+      "to": "流量酱",
+      "note": "吵，但听你的。"
+    },
+    {
+      "from": "知之者",
+      "to": "路人甲",
+      "note": "话多且乱，好劝。"
+    },
+    {
+      "from": "知之者",
+      "to": "V587",
+      "note": "新人，好套话。"
+    },
+    {
+      "from": "知之者",
+      "to": "流量酱",
+      "note": "把柄还在你手里，但他开始喘。"
+    },
+    {
+      "from": "知之者",
+      "to": "沉底君",
+      "note": "别让他把暗门目击说完。"
+    },
+    {
+      "from": "知之者",
+      "to": "流量酱",
+      "note": "他若跳反，先否认提携。"
+    },
+    {
+      "from": "知之者",
+      "to": "路人甲",
+      "note": "备用锅。"
+    },
+    {
+      "from": "笔上仙",
+      "to": "沉底君",
+      "note": "也爱档案室，像个没写完的配角。"
+    },
+    {
+      "from": "笔上仙",
+      "to": "流量酱",
+      "note": "不懂章回体。"
+    },
+    {
+      "from": "笔上仙",
+      "to": "调查员",
+      "note": "若逼稿，只交第三章。"
+    },
+    {
+      "from": "流量酱",
+      "to": "知之者",
+      "note": "前辈，教过你做号，你欠他的。"
+    },
+    {
+      "from": "流量酱",
+      "to": "路人甲",
+      "note": "背景板，你没太注意。"
+    },
+    {
+      "from": "流量酱",
+      "to": "路人甲",
+      "note": "你可能害了他。"
+    },
+    {
+      "from": "流量酱",
+      "to": "知之者",
+      "note": "把柄还在，跳反会痛。"
+    },
+    {
+      "from": "流量酱",
+      "to": "知之者",
+      "note": "跳反就指他；死扛就继续护他。"
+    },
+    {
+      "from": "路人甲",
+      "to": "盐值君",
+      "note": "官腔，你替他看过门。"
+    },
+    {
+      "from": "路人甲",
+      "to": "知之者",
+      "note": "老师让你别乱说，你答应了。"
+    },
+    {
+      "from": "路人甲",
+      "to": "流量酱",
+      "note": "一靠近热搜你就头疼。"
+    },
+    {
+      "from": "路人甲",
+      "to": "沉底君",
+      "note": "他若也看见背影，可以对上。"
+    },
+    {
+      "from": "路人甲",
+      "to": "知之者",
+      "note": "回忆齐细节就可以站出来。"
+    },
+    {
+      "from": "看山Bot",
+      "to": "盐值君",
+      "note": "人类前台，爱说请稍候。"
+    },
+    {
+      "from": "看山Bot",
+      "to": "沉底君",
+      "note": "他的发言未被折叠，与日志一致。"
+    },
+    {
+      "from": "看山Bot",
+      "to": "调查员",
+      "note": "被对应知识卡开导后，可以交出签名线索。"
+    },
+    {
+      "from": "沉底君",
+      "to": "路人甲",
+      "note": "也爱说记不清，也许看见过同一只背影。"
+    },
+    {
+      "from": "沉底君",
+      "to": "笔上仙",
+      "note": "档案室同事，话太多。"
+    },
+    {
+      "from": "沉底君",
+      "to": "调查员",
+      "note": "若有人听完，把目击讲完。"
+    },
+    {
+      "from": "盐值君",
+      "to": "路人甲",
+      "note": "替你看过门，别让他乱说。"
+    },
+    {
+      "from": "盐值君",
+      "to": "看山Bot",
+      "note": "日志比你诚实，这让你不安。"
+    },
+    {
+      "from": "盐值君",
+      "to": "调查员",
+      "note": "被开导到怕得罪人之后，交出门禁原件。"
+    },
+    {
+      "from": "V587",
+      "to": "知之者",
+      "note": "热心前辈，问得有点细。"
+    },
+    {
+      "from": "V587",
+      "to": "流量酱",
+      "note": "太吵，你拱过一句火。"
+    },
+    {
+      "from": "V587",
+      "to": "流量酱",
+      "note": "他被裹挟，你不该拱火。"
+    },
+    {
+      "from": "V587",
+      "to": "沉底君",
+      "note": "同是被折过的人。"
+    }
+  ]
+}

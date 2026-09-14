@@ -5,12 +5,50 @@ from __future__ import annotations
 import copy
 import json
 import re
+from pathlib import Path
 from typing import Any
 
 from . import mock_bible
 from .tiers import KC_COPY, LOCATION_META, QUOTA, TIERS
 
 LAST_PROVIDER = "main"
+
+_GOLDEN_PATH = Path(__file__).resolve().parent / "casebook" / "kanshan_golden.json"
+_GOLDEN_HEADER = "## 黄金样本对照（来自权威剧本 kanshan，供写法参考，禁止照抄内容）"
+_GOLDEN_MAX_CHARS = 1500
+
+
+def _golden_slice(step: str) -> str:
+    """读取 kanshan 黄金样本切片。golden.json 缺失/损坏时返回空串，绝不阻塞生成。"""
+    try:
+        data = json.loads(_GOLDEN_PATH.read_text(encoding="utf-8"))
+        if step == "world":
+            body = (
+                f"【真相分层写法】{data.get('truth_layering') or ''}\n"
+                f"【线索 tier 配比（真实统计）】{json.dumps(data.get('tier_ratio') or {}, ensure_ascii=False)}"
+            )
+        elif step == "detail":
+            fakes = (data.get("fake_evidence_samples") or [])[:2]
+            body = (
+                "【心声双层写法（said=口供 / heart=心声，edited=被篡改点）】"
+                + json.dumps(data.get("voice_dual_layer") or [], ensure_ascii=False)
+                + "\n【伪证话术范例】"
+                + json.dumps(fakes, ensure_ascii=False)
+            )
+        elif step == "acts":
+            pairs = {
+                k: v.get("proof_count")
+                for k, v in (data.get("clue_density") or {}).items()
+            }
+            body = (
+                f"【幕节奏】{json.dumps(data.get('act_rhythm') or [], ensure_ascii=False)}"
+                f"\n【真相-线索配对密度】{json.dumps(pairs, ensure_ascii=False)}"
+            )
+        else:
+            return ""
+        return f"{_GOLDEN_HEADER}\n{body}"[:_GOLDEN_MAX_CHARS]
+    except Exception:
+        return ""
 
 _CHAR_IDS = ("char_01", "char_02", "char_03", "char_04")
 _FACTIONS = {
@@ -200,6 +238,8 @@ def _repair_truncated(text: str) -> str:
 
 def _step_world(client, seed: str, skeleton: dict, *, inner_boss: bool = False) -> dict:
     system, user = _render_prompt("studio_world.md", seed=seed)
+    if _golden_slice("world"):
+        user = f"{user}\n\n{_golden_slice('world')}"
     raw = _llm_json(client, system, user, step="world")
     world = _patch_world(raw, skeleton["world"], inner_boss=inner_boss)
     _assert_world(world)
@@ -217,6 +257,8 @@ _DETAIL_SHRINK_HINT = (
 def _step_detail(client, seed: str, world: dict, skeleton: dict) -> dict:
     world_json = json.dumps(world, ensure_ascii=False, indent=2)
     system, user = _render_prompt("studio_detail.md", seed=seed, world_json=world_json)
+    if _golden_slice("detail"):
+        user = f"{user}\n\n{_golden_slice('detail')}"
     raw = _llm_json(client, system, user, step="detail", shrink_hint=_DETAIL_SHRINK_HINT)
     detail = _patch_detail(raw, skeleton["detail"], world)
     _assert_detail(detail)
@@ -242,6 +284,8 @@ def _step_acts(client, seed: str, world: dict, detail: dict, skeleton: dict) -> 
         world_json=world_json,
         detail_json=detail_json,
     )
+    if _golden_slice("acts"):
+        user = f"{user}\n\n{_golden_slice('acts')}"
     raw = _llm_json(client, system, user, step="acts")
     acts = _patch_acts(raw, skeleton["acts"])
     _assert_acts(acts)

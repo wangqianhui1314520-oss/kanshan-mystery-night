@@ -78,7 +78,6 @@ button.cs-kw { width: auto; display: inline-block; }
 .toast-zone { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); right: max(18px, env(safe-area-inset-right, 0px)); }
 .toast { backdrop-filter: blur(8px); border-radius: 10px; line-height: 1.5; }
 .toast.kind.loading { border-color: var(--line); }
-.objective-cta { margin: 10px 0 2px; min-height: 34px; box-shadow: 0 4px 14px rgba(0,132,255,.22); }
 
 /* ---------- 5. 三态占位（空 / 加载中 / 错误） ---------- */
 .ux-state {
@@ -209,7 +208,6 @@ button.cs-kw { width: auto; display: inline-block; }
   .banner-zone { top: 68px; }
   .toast-zone { left: 12px; right: 12px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); align-items: stretch; }
   .toast { max-width: none; }
-  .objective-cta { width: 100%; margin-top: 9px; }
 
   /* 视图主内容单列；圆桌页由 chat_ref 自己锁视口，这里不强制撑高 */
   .view { padding: 12px 12px calc(84px + env(safe-area-inset-bottom, 0px)); }

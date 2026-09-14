@@ -95,6 +95,25 @@ def _ending(resp: dict) -> dict | None:
     return next((e for e in resp["events"] if e["type"] == "ending"), None)
 
 
+def _wait_ending(sid: str, timeout: float = 40) -> dict | None:
+    """P0-3 终版：AI 席跟票在后台 wave 中异步完成——终局事件可能晚于
+    vote 的 REST 响应落库，轮询会话事件流直到 ending 出现（生产 WS 由
+    broadcast 即时推送，无此窗口）。"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            st = httpx.get(f"{BASE}/api/session/{sid}", timeout=5).json()
+            events = (st.get("session") or {}).get("events") or []
+            ending = next((e for e in reversed(events)
+                           if e.get("type") == "ending"), None)
+            if ending is not None:
+                return ending
+        except Exception:
+            pass
+        time.sleep(0.4)
+    return None
+
+
 class TestLiveServerE2E:
     def test_health_engine_mode_real(self, live_server):
         """起服验证：真实引擎模式（mock 关闭）、内容池就绪。"""
@@ -154,12 +173,15 @@ class TestLiveServerE2E:
         # 投非真凶（hit=False）→ 矩阵落到 counsel≥4 分支
         wrong = next(n["id"] for n in view["npcs"] if n["id"] != CULPRIT)
         resp = _act(c, sid, "vote", target=wrong)
-        ending = _ending(resp)
+        ending = _ending(resp) or _wait_ending(sid)
         assert ending is not None
         assert ending["payload"]["outcome"] == "all_hearts_clear"
         assert ending["payload"]["counsel_settlement"]["counsel_count"] == 4
         assert ending["payload"]["counsel_settlement"]["hidden_unlock"] is True
-        assert resp["session"]["status"] == "ended"
+        # P0-3 终版：终局由后台跟票 wave 异步落库，响应快照尚为 playing；
+        # 以 _wait_ending 后的最终会话状态为准。
+        final_status = httpx.get(f"{BASE}/api/session/{sid}", timeout=5).json()["session"]["status"]
+        assert final_status == "ended"
         c.close()
 
     def test_boss_chain_rest_g04_fixed_truth_revealed(self, live_server):
@@ -191,7 +213,7 @@ class TestLiveServerE2E:
         _act(c, sid, "advance")
         _act(c, sid, "advance")  # → accuse
         resp = _act(c, sid, "vote", target="dm")
-        ending = _ending(resp)
+        ending = _ending(resp) or _wait_ending(sid)
         assert ending["payload"]["accused"] == "dm"
         # G04 修复：终局复盘注入使破绽 5/5，boss 裁决放行；心晴 1<2 → truth_revealed
         assert ending["payload"]["outcome"] == "truth_revealed"

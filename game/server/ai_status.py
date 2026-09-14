@@ -30,7 +30,8 @@ def describe_ai(env, config=None, session=None):
                 break
             if event.get('type') == 'chat' and payload.get('source') == 'agent' and payload.get('provider'):
                 actual = str(payload['provider'])
-                if actual in ('mock', 'fallback'):
+                # P1-2：fallback:* 前缀 = 守卫层替换（identity_guarded/violations）
+                if actual in ('mock', 'fallback') or actual.startswith('fallback:'):
                     state, notice = 'failed', '最近返回的是兜底内容，不能视为实时 AI 成功。'
                 elif 'cache' in actual:
                     state, notice = 'cache', '本局最近一次回复来自缓存；尚不能确认接口当前在线。'

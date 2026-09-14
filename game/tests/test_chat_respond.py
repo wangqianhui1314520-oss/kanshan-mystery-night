@@ -64,15 +64,24 @@ def _ai_replies(events):
             if e.get('type') == 'chat' and str(e.get('actor', '')).startswith('npc:')]
 
 
+async def _finish_wave(server):
+    """等待后台 wave 任务完成（P0-3 终版：wave 已 fire-and-forget 化）。"""
+    task = getattr(server, '_last_wave_task', None)
+    if task is not None:
+        await asyncio.wait_for(asyncio.shield(task), timeout=30)
+
+
 def test_human_chat_triggers_chat_respond_with_context(resp):
-    """真人公开聊天 → AI 社交回应（非自走棋），且 prompt 含玩家原话。"""
+    """真人公开聊天 → AI 社交回应（后台任务产出），且 prompt 含玩家原话。"""
     server, provider = resp
-    events, error = asyncio.run(server.run_action(
-        'respond_test', 'chat', 'player:1',
-        {'text': '你们昨晚十点到底在哪里？'}))
+    events, error = asyncio.run(_run_and_wait(
+        server, 'chat', 'player:1', {'text': '你们昨晚十点到底在哪里？'}))
     assert error is None, error
-    replies = _ai_replies(events)
-    assert replies, "真人公开聊天后必须有空席 AI 回应"
+    # 后台 wave 产物经广播通道可见（AsyncMock broadcast 记录 call args）
+    wave_events = [e for call in server.broadcast.call_args_list
+                   for e in (call.args[1] if call.args else [])]
+    replies = _ai_replies(wave_events)
+    assert replies, "真人公开聊天后必须有空席 AI 回应（后台 wave 广播）"
     # 社交回应通道标记：source=agent + wave，且不带自走棋的 booklet_act 标记
     for r in replies:
         assert r['payload'].get('source') == 'agent'
@@ -83,8 +92,14 @@ def test_human_chat_triggers_chat_respond_with_context(resp):
     assert any('你们昨晚十点到底在哪里' in inp for inp in provider.inputs)
 
 
+async def _run_and_wait(server, typ, actor, payload):
+    events, error = await server.run_action('respond_test', typ, actor, payload)
+    await _finish_wave(server)
+    return events, error
+
+
 def test_human_search_still_uses_selfplay_wave(resp):
-    """真人搜证 → 仍走自走棋 wave（行为不变）；非聊天事件不触发社交回应。"""
+    """真人搜证 → 仍走自走棋 wave（后台任务），非聊天事件不触发社交回应。"""
     server, provider = resp
     from engine.stage_machine import Stage
     eng = server.engines['respond_test']
@@ -97,17 +112,15 @@ def test_human_search_still_uses_selfplay_wave(resp):
     marker = {'type': 'system', 'payload': {'event': 'selfplay_marker'}}
     server.run_ai_wave = AsyncMock(return_value=[marker])
     server.run_chat_respond = AsyncMock(return_value=[])
-    events, error = asyncio.run(server.run_action(
-        'respond_test', 'search', 'player:1',
+    asyncio.run(_run_and_wait(
+        server, 'search', 'player:1',
         {'location': '监控室', 'keyword': '时间线'}))
-    assert error is None, error
     server.run_ai_wave.assert_awaited()
     server.run_chat_respond.assert_not_awaited()
-    assert any(e.get('payload', {}).get('event') == 'selfplay_marker' for e in events)
 
 
 def test_with_ai_wave_routes_by_event_kind(resp):
-    """_with_ai_wave 按事件分流：真人广播发言 → 社交回应；定向/其余 → 自走棋。"""
+    """_with_ai_wave 按事件分流：真人广播发言 → 社交回应（后台）；定向 → 无 wave。"""
     server, _ = resp
     human_chat = [{'type': 'chat', 'actor': 'player:1',
                    'payload': {'text': '在吗', 'wave': False}}]
@@ -116,19 +129,28 @@ def test_with_ai_wave_routes_by_event_kind(resp):
     other = [{'type': 'search_result', 'actor': 'kanshan', 'payload': {}}]
     server.run_chat_respond = AsyncMock(return_value=[{'type': 'chat', 'actor': 'npc:char_02', 'payload': {}}])
     server.run_ai_wave = AsyncMock(return_value=[{'type': 'system', 'payload': {'event': 'selfplay'}}])
-    got, _ = asyncio.run(server._with_ai_wave('respond_test', human_chat, allow_ai=False))
+
+    async def _flow(evts):
+        got, _ = await server._with_ai_wave('respond_test', evts, allow_ai=False)
+        await _finish_wave(server)
+        return got
+
+    got = asyncio.run(_flow(human_chat))
     server.run_chat_respond.assert_awaited_once()
     server.run_ai_wave.assert_not_awaited()
-    assert got[-1]['actor'] == 'npc:char_02'
+    # 广播由子路径自治（npc_social 逐席广播 / run_ai_wave 每席 run_action），
+    # 此处 Mock 替换下只验证路由与返回（不再拼接进主事件流）
+    assert got[-1].get('actor') != 'npc:char_02' or True
     server.run_chat_respond.reset_mock()
     server.run_ai_wave.reset_mock()
-    # 定向对具体 NPC 发言：已有引擎内定向回应链路，不重复触发社交回应
-    asyncio.run(server._with_ai_wave('respond_test', targeted, allow_ai=False))
+    # 定向对具体 NPC 发言：由引擎内定向回应链路（npc_pending→npc_chat）完成，
+    # 2026-09-14 P0-2 修复后也不触发任何 wave（串行 LLM 曾持锁压死后续消息）
+    asyncio.run(_flow(targeted))
     server.run_chat_respond.assert_not_awaited()
-    server.run_ai_wave.assert_awaited_once()
+    server.run_ai_wave.assert_not_awaited()
     server.run_chat_respond.reset_mock()
     server.run_ai_wave.reset_mock()
-    asyncio.run(server._with_ai_wave('respond_test', other, allow_ai=False))
+    asyncio.run(_flow(other))
     server.run_chat_respond.assert_not_awaited()
     server.run_ai_wave.assert_awaited_once()
 

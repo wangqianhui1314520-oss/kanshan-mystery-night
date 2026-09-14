@@ -83,7 +83,8 @@ class ZhihuOAuth:
                 "grant_type": "authorization_code",
                 "redirect_uri": self.redirect_uri, "code": code}
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout,
+                                         trust_env=False) as client:
                 resp = await client.post(f"{self.openapi_base}/access_token",
                                          data=form)
         except httpx.HTTPError as e:
@@ -126,7 +127,8 @@ class ZhihuOAuth:
                    "X-OAuth-Token": oauth_token,
                    "X-Request-Timestamp": str(int(time.time()))}
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout,
+                                         trust_env=False) as client:
                 resp = await client.get(f"{self.openapi_base}/user", headers=headers)
         except httpx.HTTPError as e:
             self.last_error = f"网络失败：{type(e).__name__}"

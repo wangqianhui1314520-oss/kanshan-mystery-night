@@ -11,6 +11,17 @@ from .mock_engine import make_event
 from .reply_guard import RETRY_HINT, has_product_identity
 from .safety import check_text
 
+# 守卫违规替换句池（2026-09-14 P1-1）：台词触发一致性守卫时的保守收口。
+# 按原 reply 长度稳定取样，多席同轮触发也各不相同（不用 random，可复现）。
+_VIOLATION_SAFE_LINES = (
+    "这件事我还不能确定，先核对已经公开的口供。",
+    "（看了你一眼）你说的这个，我暂时不便多讲。",
+    "先把我刚才说的公开部分记住，别急着往下问。",
+    "这话我得斟酌一下，等大家都把话说清楚再说。",
+    "你这么问是想套我的话？公开的部分我再说一遍就是了。",
+    "（笑了笑）这个问题，恐怕你自己心里也有数。",
+)
+
 
 def infer_social_phase(session: dict, stage: str) -> str:
     """从最近 DM 引导文本推断社交 phase，让 AI 跟随 DM 引导行动。
@@ -200,7 +211,11 @@ async def social_request(server, session_id, body, *, private=False,
                     reply = await asyncio.to_thread(npc.respond, prompt, trust=0, context=retry_context)
                     provider = getattr(llm, "last_provider", "")
                 if violations:
-                    reply = "这件事我还不能确定，先核对已经公开的口供。"
+                    # P1-1（2026-09-14）：扩池+稳定轮换，按原 reply 长度取样——
+                    # 多席同时触发也各不相同，不再单句复读。
+                    npc.last_reply_kind = "violations"
+                    reply = _VIOLATION_SAFE_LINES[
+                        len(str(reply)) % len(_VIOLATION_SAFE_LINES)]
                 if not check_text(reply)[0]:
                     raise ValueError("unsafe reply")
             except Exception as exc:
@@ -228,6 +243,11 @@ async def social_request(server, session_id, body, *, private=False,
             payload = {"actor_kind": "npc", "char_id": cid, "text": reply,
                        "source": "agent", "provider": provider,
                        "ai_provider": str(provider or ""), "wave": not private}
+            # P1-2 诚实化：守卫层替换（identity_guarded/violations）标 fallback:*
+            kind = getattr(npc, "last_reply_kind", "llm")
+            if kind != "llm":
+                payload["provider"] = payload["ai_provider"] = f"fallback:{kind}"
+                payload["degraded"] = True
             if private:
                 payload.update(whisper=True, to=sender, reply_to=sender)
             events.append(event("npc:" + cid, payload))

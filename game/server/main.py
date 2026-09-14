@@ -255,6 +255,8 @@ class GameServer:
                 model = cfg.get("llm_model") or os.environ.get("ZHIHU_LLM_MODEL", "zhida-agent")
         if not (key and base and model):
             return None
+        panel_main = bool(cfg.get("llm_key") and cfg.get("llm_base")
+                          and cfg.get("llm_model"))
         os.environ["LLM_API_KEY"] = key
         os.environ["LLM_BASE_URL"] = base
         os.environ["LLM_MODEL"] = model
@@ -264,7 +266,14 @@ class GameServer:
         if "developer.zhihu.com" in base:
             os.environ["ZHIHU_APP_KEY"] = key
         try:
-            from agents.llm_client import LLMClient
+            from agents.llm_client import LLMClient, OpenAICompatProvider, MockProvider
+            if panel_main:
+                # 用户在面板显式指定自建端点（如 DeepSeek）→ 本对局 AI 全量走
+                # main 通道：不注册 zhida 槽位，call_gateway(provider="zhida")
+                # 经 _pick 降级自然落 main——否则 env 里的知乎凭证恒可用、
+                # zhida 恒优先，面板配置永远不会生效（用户实测复现的根因）。
+                return LLMClient(providers={"main": OpenAICompatProvider(),
+                                            "mock": MockProvider()})
             return LLMClient()
         except Exception:
             return None
@@ -575,6 +584,14 @@ class GameServer:
         session = self.store.load_session(session_id)
         if session is None:
             return [], {"status": 404, "notice": f"对局不存在：{session_id}"}
+        # 竞态幂等（2026-09-14 后台 wave 化取证）：自走棋 AI 席与真人同权
+        # 投票，AI 先投满 → 对局 ended 时玩家的 vote 动作会扑空（引擎拒绝
+        # ended 会话）。此时幂等重放已存终局事件，前端仍能正常收尾。
+        if session.get("status") == "ended":
+            ending = next((e for e in reversed(session.get("events") or [])
+                           if e.get("type") == "ending"), None)
+            if ending is not None:
+                return [ending], None
         # 所有入口（REST、WS、AI 补位）共享的输入边界。ContentSafetyMiddleware
         # 负责危险内容类别，本处负责类型/长度，避免超大提示词拖垮模型与事件日志。
         payload = payload if isinstance(payload, dict) else {}
@@ -643,14 +660,17 @@ class GameServer:
                 self._drop_action_lock(session_id)
         # rt 演出层（并存）：计数记账 → 终局成就/报告 → 轮转广播事故
         # 玩家聊天复用空席的配置解析：设置面板 / 环境变量 / 知乎默认通道。
+        targeted_npc_chat = False
         if action_type == "chat" and not allow_ai and not use_mock:
             tgt = str(payload.get("target") or payload.get("char_id") or "dm").removeprefix("npc:")
             is_dm = tgt in ("dm", "kanshan", "dm_kanshan")
             if is_dm:
                 tgt = "dm"
+            targeted_npc_chat = not is_dm and bool(tgt)
             llm = self._llm_for_session(session_id)
             reply, failure = None, None
             provider = ""
+            reply_kind = "llm"  # P1-2 诚实化：llm/identity_guarded/violations/fallback
             try:
                 if llm is None or AgentRuntime is None:
                     failure = "AI 对话未配置可用接口，请检查 API 设置。"
@@ -660,7 +680,11 @@ class GameServer:
                     if is_dm:
                         from agents.llm_client import call_gateway
                         rt.dm.set_flaw_count(session.get("flaw_count", 0))
-                        reply = call_gateway(llm, rt.dm._persona_system(),
+                        # to_thread（2026-09-14 P0-3 压测取证）：call_gateway 内部
+                        # 是同步 urllib，直接在事件循环里调用会冻结全部 WS 心跳
+                        # （10 并发时 8 连接 1011 被踢）。
+                        reply = await asyncio.to_thread(
+                            call_gateway, llm, rt.dm._persona_system(),
                             "请以主持人口吻简短回应玩家，只参考当前公开状态，不透露隐藏答案。\n"
                             + json.dumps({"stage": session.get("stage"),
                                           "actions_left": session.get("actions_left"),
@@ -674,18 +698,28 @@ class GameServer:
                         previous = npc.gateway
                         npc.gateway = llm
                         try:
-                            reply = rt.npc_chat(tgt, payload.get("text", "")).get("reply")
+                            # npc_chat 为纯同步函数（LLM urllib + 守卫），to_thread
+                            # 化保证事件循环在 LLM 往返期间持续服务其他连接。
+                            npc_res = await asyncio.to_thread(
+                                rt.npc_chat, tgt, payload.get("text", ""))
+                            reply = npc_res.get("reply")
+                            reply_kind = npc_res.get("reply_kind") or "llm"
                         finally:
                             npc.gateway = previous
                     else:
                         failure = "请选择一位在场角色再对话。"
                     provider = getattr(llm, "last_provider", "")
-                    if getattr(llm, "last_error", "") or provider in ("mock", "fallback"):
+                    # LLM 层失败（last_error/mock/fallback）才重试；守卫层替换
+                    # （identity_guarded/violations）已有兜底台词，重试无意义。
+                    llm_failed = (bool(getattr(llm, "last_error", ""))
+                                  or provider in ("mock", "fallback"))
+                    if llm_failed:
                         # 瞬时限流（429 退避后仍失败）：2.5s 后静默重试一次，玩家无感
-                        time.sleep(2.5)
+                        await asyncio.sleep(2.5)
                         try:
                             if is_dm:
-                                reply = call_gateway(llm, rt.dm._persona_system(),
+                                reply = await asyncio.to_thread(
+                                    call_gateway, llm, rt.dm._persona_system(),
                                     "请以主持人口吻简短回应玩家，只参考当前公开状态，不透露隐藏答案。\n"
                                     + json.dumps({"stage": session.get("stage"),
                                                   "actions_left": session.get("actions_left"),
@@ -696,13 +730,18 @@ class GameServer:
                                 previous = npc.gateway
                                 npc.gateway = llm
                                 try:
-                                    reply = rt.npc_chat(tgt, payload.get("text", "")).get("reply")
+                                    npc_res = await asyncio.to_thread(
+                                        rt.npc_chat, tgt, payload.get("text", ""))
+                                    reply = npc_res.get("reply")
+                                    reply_kind = npc_res.get("reply_kind") or "llm"
                                 finally:
                                     npc.gateway = previous
                             provider = getattr(llm, "last_provider", "")
+                            llm_failed = (bool(getattr(llm, "last_error", ""))
+                                          or provider in ("mock", "fallback"))
                         except Exception:
                             pass
-                    if getattr(llm, "last_error", "") or provider in ("mock", "fallback"):
+                    if llm_failed:
                         why = (llm.degrade_log[-1] if getattr(llm, "degrade_log", None)
                                else "") or "上游暂不可用"
                         failure = (f"AI 接口暂时未能返回回复（{why[:90]}）。"
@@ -721,7 +760,8 @@ class GameServer:
                 try:
                     from agents.llm_client import call_gateway
                     if is_dm:
-                        retry_reply = call_gateway(llm, rt.dm._persona_system(),
+                        retry_reply = await asyncio.to_thread(
+                            call_gateway, llm, rt.dm._persona_system(),
                             "请以主持人口吻简短回应玩家，只参考当前公开状态，不透露隐藏答案。\n"
                             + json.dumps({"stage": session.get("stage"),
                                           "actions_left": session.get("actions_left"),
@@ -733,7 +773,8 @@ class GameServer:
                         previous = npc.gateway
                         npc.gateway = llm
                         try:
-                            retry_reply = rt.npc_chat(tgt, payload.get("text", "")).get("reply")
+                            retry_reply = (await asyncio.to_thread(
+                                rt.npc_chat, tgt, payload.get("text", ""))).get("reply")
                         finally:
                             npc.gateway = previous
                 except Exception:
@@ -743,6 +784,7 @@ class GameServer:
                 else:
                     from agents.llm_client import fallback_text
                     reply = fallback_text("stage_announce" if is_dm else "npc_reply")
+                    reply_kind = "identity_guarded"
             # 替换引擎占位，同时持久化最终回复，重连后仍能看到。
             pending = [e for e in events if e.get("type") == "system"
                        and e.get("payload", {}).get("event") == "npc_pending"]
@@ -752,10 +794,15 @@ class GameServer:
                     "event": "ai_reply_failed", "notice": failure, "toast": failure,
                     "kind": "warn", "reply_to": actor, "target": tgt})
             else:
+                # P1-2 诚实化：守卫层替换（identity_guarded/violations）时
+                # provider 标 fallback:* 并带 degraded，前端/诊断可识别降级。
+                if reply_kind != "llm":
+                    provider = f"fallback:{reply_kind}"
                 reply_event = make_event("chat", session_id, session["round"],
                     "dm" if is_dm else "npc:" + tgt, {
                         "text": str(reply), "source": "agent", "provider": provider,
                         "ai_provider": str(provider or ""),
+                        "degraded": reply_kind != "llm",
                         "identity_guarded": identity_guarded,
                         "actor_kind": "dm" if is_dm else "npc", "char_id": tgt,
                         "target": tgt, "reply_to": actor})
@@ -791,6 +838,10 @@ class GameServer:
                 self.store.save_session(session_id, session)
             events = events + rt_events
         await self.broadcast(session_id, events)
+        # P0-2：定向 NPC 私聊不触发自走棋 wave（npc_chat 已直接回应玩家；
+        # wave 的 9 席串行 LLM 会持锁 60s+ 压死同房间后续消息）。
+        if targeted_npc_chat:
+            return events, None
         return await self._with_ai_wave(session_id, events, allow_ai)
 
     async def _with_ai_wave(self, session_id: str, events: list[dict],
@@ -800,30 +851,76 @@ class GameServer:
         真人「公开聊天」走社交回应路径（AI 针对聊天内容回答/追问/质疑，
         并跟随 DM 引导轮流介绍/陈述证词）；其余动作（搜证/技能/投票）保持
         自走棋 wave（PlayerAgent 按闭卷决策）。
+
+        P0-3 终版（2026-09-14 压测取证）：wave 改为后台任务（fire-and-forget）
+        ——此前在本协程内 await 全席串行 LLM（60s~2min），把同连接/同房间
+        后续消息全部压死（含 ping），是「AI 聊不起来」的最终元凶。后台任务
+        自行落库 + 广播；_ai_waving 防重入；任务引用存 _last_wave_task 供测试。
         """
         if allow_ai or getattr(self, "_ai_waving", False):
+            if getattr(self, "_ai_waving", False) and not allow_ai:
+                # P0-3 终版（压测取证）：wave 进行中不丢弃新意图——排入
+                # pending，由后台任务消化。否则最后一个动作的 AI 补位丢失
+                # （solo 投票阶段 needed 永远无法满足，对局死锁）。
+                self._wave_pending = True
+                self._wave_pending_social = any(
+                    e.get("type") == "chat"
+                    and str((e.get("payload") or {}).get("target") or "").removeprefix("npc:") in ("", "dm")
+                    for e in events)
             return events, None
-        self._ai_waving = True
-        try:
-            # 全场广播式发言（无 target 或对 DM）才触发社交回应；对具体 NPC 的
-            # 定向发言已有引擎内定向回应链路（npc_pending→npc_chat），不重复。
-            # 引擎会把 target 规范化为 npc: 前缀（dm→npc:dm），统一剥离后比较。
-            has_human_broadcast_chat = any(
+        # 定向对具体 NPC 的真人私聊（2026-09-14 P0-2 压测取证）：定向回应由
+        # 引擎内 npc_pending→npc_chat 链路完成，不再触发任何 wave。
+        if any(
                 e.get("type") == "chat"
-                and not (e.get("payload") or {}).get("whisper")
-                and not (e.get("payload") or {}).get("team")
-                and str((e.get("payload") or {}).get("target") or "").removeprefix("npc:") in ("", "dm")
+                and str((e.get("payload") or {}).get("target") or "").removeprefix("npc:") not in ("", "dm")
                 and str(e.get("actor") or "").startswith("player:")
                 and not str(e.get("actor") or "").startswith("player:ai:")
-                for e in events)
-            extra = (await self.run_chat_respond(session_id)
-                     if has_human_broadcast_chat
-                     else await self.run_ai_wave(session_id))
+                and not (e.get("payload") or {}).get("whisper")
+                for e in events):
+            return events, None
+        # 全场广播式发言（无 target 或对 DM）才触发社交回应；其余动作走
+        # 自走棋 wave。引擎会把 target 规范化为 npc: 前缀，统一剥离后比较。
+        has_human_broadcast_chat = any(
+            e.get("type") == "chat"
+            and not (e.get("payload") or {}).get("whisper")
+            and not (e.get("payload") or {}).get("team")
+            and str((e.get("payload") or {}).get("target") or "").removeprefix("npc:") in ("", "dm")
+            and str(e.get("actor") or "").startswith("player:")
+            and not str(e.get("actor") or "").startswith("player:ai:")
+            for e in events)
+        self._last_wave_task = asyncio.create_task(
+            self._run_wave_background(session_id, has_human_broadcast_chat))
+        return events, None
+
+    async def _run_wave_background(self, session_id: str,
+                                   use_social: bool) -> None:
+        """后台跑 wave：不阻塞任何玩家动作。
+
+        广播与落库由子路径自治（契约 2026-09-14 双广播修复 + npc_social 逐席
+        实时广播）：run_ai_wave 每席 run_action(allow_ai=True) 内部落库并广播；
+        run_chat_respond（npc_social）逐席广播 + save_session。本函数若再
+        广播/落库即为双份（message_id 重复事故，回归守护 test_chat_dup_guard）。
+        wave 进行中到达的新意图进 _wave_pending 队列，本任务循环消化——
+        保证最后一拍动作的 AI 补位不丢（否则投票阶段死锁）。
+        """
+        self._ai_waving = True
+        try:
+            pending_social = use_social
+            while True:
+                try:
+                    if pending_social:
+                        await self.run_chat_respond(session_id)
+                    else:
+                        await self.run_ai_wave(session_id)
+                except Exception:
+                    pass  # 后台 wave 失败不传播：玩家动作已完成，降级在事件内可见
+                if getattr(self, "_wave_pending", False):
+                    pending_social = bool(getattr(self, "_wave_pending_social", False))
+                    self._wave_pending = False
+                    continue
+                break
         finally:
             self._ai_waving = False
-        if extra:
-            events = events + extra
-        return events, None
 
     async def run_chat_respond(self, session_id: str) -> list[dict]:
         """真人公开发言后的 AI 社交回应：走 npc_social 公开波（带最近聊天
@@ -876,11 +973,12 @@ class GameServer:
                 if err is None and body.get("applied"):
                     seat_events = body.get("events") or []
                     collected.extend(seat_events)
-                    # 逐席实时广播（微信式消息流）：WS 房间立刻收到本席台词，
-                    # 前端 aiSpeechQueue 按席位顺序逐条上屏；handle 丢弃返回值，
-                    # 不会二次广播（HTTP /ai_wave 响应仍带事件，非 WS 前端走那条）。
-                    if seat_events:
-                        await self.broadcast(session_id, seat_events)
+                    # 广播契约（2026-09-14 双广播修复）：本批事件已由
+                    # run_ai_act → run_action(allow_ai=True) 内部统一广播
+                    # （run_action 末尾 broadcast），此处不得再广播同一批
+                    # seat_events——曾因双广播 + 事件无 message_id 导致
+                    # WS 前端每条 AI 台词相邻上屏两遍。非 WS 前端走
+                    # HTTP /ai_wave 响应的 events，保持不变。
             except Exception:
                 continue
         # AI 演出位：小游戏（心声窃听）+ 暗拍/头条，每幕各至多一次，零副作用兜底
@@ -1368,9 +1466,15 @@ def _require_studio():
             f"{_STUDIO_IMPORT_ERROR or 'unknown'}"))
 
 
+# 创作任务进程内存表（job_id → 进度记录）+ 创作互斥锁：
+# 同一时刻只放行一个 generate 任务，避免与对局抢 LLM 并发。
+_STUDIO_JOBS: dict[str, dict] = {}
+_STUDIO_GEN_LOCK = asyncio.Lock()
+
+
 @app.post("/api/studio/generate")
 async def studio_generate(req: Request):
-    """一句话生成快本（认约 STUDIO_WORKBENCH §4）。"""
+    """一句话生成快本（异步受理：202 → 轮询 GET /api/studio/jobs/{job_id}）。"""
     _require_studio()
     try:
         body = await req.json()
@@ -1385,19 +1489,94 @@ async def studio_generate(req: Request):
     if not seed:
         raise HTTPException(status_code=400, detail="seed 不能为空")
     tier = str(body.get("tier", "demo"))
+    try:
+        from studio.tiers import TIERS as _studio_tiers
+    except Exception:
+        _studio_tiers = ()
+    if _studio_tiers and tier not in _studio_tiers:
+        raise HTTPException(status_code=400, detail=(
+            f"tier 必须为 {'/'.join(_studio_tiers)}，收到：{tier!r}"))
     use_llm = bool(body.get("use_llm", False))
     inner_boss = bool(body.get("inner_boss", False))
+    # zhihu 素材桥参数：本版本只校验透传（占位写入 job.zhihu_refs），不实际调用——
+    # 素材桥由并行开发接入后在此消费。
+    zhihu = body.get("zhihu") if isinstance(body.get("zhihu"), dict) else None
+    job_id = f"job_{uuid.uuid4().hex[:12]}"
+    rec: dict = {"job_id": job_id, "status": "running", "seed_text": seed,
+                 "tier": tier, "scenario_id": None,
+                 "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    _STUDIO_JOBS[job_id] = rec
+
+    def _run() -> None:
+        try:
+            job = generate(seed, tier=tier, use_llm=use_llm,
+                           inner_boss=inner_boss, brief=brief)
+        except Exception as e:  # noqa: BLE001 —— 失败落进内存记录供轮询
+            rec["status"] = "failed"
+            rec["error"] = f"{type(e).__name__}: {e}"
+            return
+        job["job_id"] = job_id
+        job["zhihu_refs"] = zhihu or {}
+        rec.update(_slim_job_for_response(job))
+
+    async def _runner() -> None:
+        async with _STUDIO_GEN_LOCK:
+            await asyncio.to_thread(_run)
+
+    asyncio.create_task(_runner())
+    return JSONResponse(status_code=202, content={
+        "ok": True, "job_id": job_id, "scenario_id": rec["scenario_id"],
+        "status": "running",
+        "notice": f"生成任务已受理，请轮询 GET /api/studio/jobs/{job_id}"})
+
+
+@app.get("/api/studio/jobs/{job_id}")
+async def studio_job(job_id: str):
+    """创作任务进度（内存优先；job_id 兼容直接查 gen_* scenario_id 的磁盘 job）。"""
+    _require_studio()
+    rec = _STUDIO_JOBS.get(job_id)
+    if rec is not None:
+        return {"ok": True, "job": rec}
+    if str(job_id).startswith("gen_"):
+        try:
+            return {"ok": True, "job": _slim_job_for_response(load_job(job_id))}
+        except FileNotFoundError:
+            pass
+    raise HTTPException(status_code=404, detail=f"任务不存在：{job_id}")
+
+
+@app.get("/api/studio/catalog")
+async def studio_catalog():
+    """选本页目录：content/scenarios/ 下全部 gen_* 包（kanshan/template 不入册）。"""
+    _require_studio()
     try:
-        job = generate(seed, tier=tier, use_llm=use_llm, inner_boss=inner_boss, brief=brief)
-        notice = ("生成完成（闸门绿，可开玩）" if job.get("status") == "ready"
-                  and (job.get("gate") or {}).get("ok")
-                  else f"生成完成但闸门未绿（status={job.get('status')}）")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=(
-            f"生成失败：{type(e).__name__}: {e}")) from e
-    return {"ok": True, "job": _slim_job_for_response(job), "notice": notice}
+        from studio.paths import SCENARIOS
+    except Exception:
+        SCENARIOS = None  # type: ignore[assignment]
+    items: list[dict] = []
+    if SCENARIOS is not None and SCENARIOS.is_dir():
+        for d in sorted(SCENARIOS.glob("gen_*")):
+            if not d.is_dir():
+                continue
+            sid = d.name
+            title = sid
+            try:
+                title = (json.loads(
+                    (d / "scenario.json").read_text(encoding="utf-8")
+                ).get("title") or sid)
+            except Exception:
+                pass
+            gate_ok, created_at = False, None
+            try:
+                job = load_job(sid)
+                gate_ok = bool((job.get("gate") or {}).get("ok"))
+                created_at = job.get("created_at")
+            except Exception:
+                pass
+            items.append({"scenario_id": sid, "title": title,
+                          "status": "ready" if gate_ok else "failed",
+                          "created_at": created_at})
+    return {"ok": True, "items": items}
 
 
 @app.get("/api/studio")
@@ -1456,6 +1635,22 @@ async def studio_book(scenario_id: str, char_id: str):
     return {"ok": True, "book": book}
 
 
+# P2-1（2026-09-14 压测取证）：player_id 无长度上限，10 万字符可进存档
+# （内存放大 + 存档污染）。统一入口校验。
+_PLAYER_ID_MAX = 64
+
+
+def _norm_player_id(raw, default: str = "player:1") -> str:
+    """规范化并校验 player_id（≤64 字符）；超长抛 400。"""
+    pid = str(raw if raw is not None else default).strip() or default
+    if not pid.startswith("player:"):
+        pid = f"player:{pid}"
+    if len(pid) > _PLAYER_ID_MAX:
+        raise HTTPException(status_code=400,
+                            detail=f"player_id 过长（≤{_PLAYER_ID_MAX} 字符）")
+    return pid
+
+
 @app.post("/api/session")
 async def create_session(req: Request):
     """创建对局（mode=main|daily|quick）。"""
@@ -1475,9 +1670,7 @@ async def create_session(req: Request):
             body.get("scenario_id"))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    host = str(body.get("player_id", "player:1")).strip() or "player:1"
-    if not host.startswith("player:"):
-        host = f"player:{host}"
+    host = _norm_player_id(body.get("player_id"))
     want_char = str(body.get("char_id") or body.get("role") or "").strip()
     # 前端设置面板透传的 API 配置（会话级，内存态不落盘——凭证纪律）
     api_cfg = ingest_api_headers(req)
@@ -1745,6 +1938,9 @@ async def join_session(session_id: str, req: Request):
         raise HTTPException(status_code=403, detail="房间码错误")
     if not player_id.startswith(("player:", "spectator:")):
         player_id = f"player:{player_id}" if role == "player" else f"spectator:{player_id}"
+    if len(player_id) > _PLAYER_ID_MAX:
+        raise HTTPException(status_code=400,
+                            detail=f"player_id 过长（≤{_PLAYER_ID_MAX} 字符）")
     if role == "spectator":
         if player_id not in session.get("spectators", []):
             session.setdefault("spectators", []).append(player_id)
@@ -1813,7 +2009,7 @@ async def session_login(session_id: str, req: Request):
         body = await req.json()
     except ValueError:
         raise HTTPException(status_code=400, detail="请求体必须是 JSON")
-    player_id = str(body.get("player_id", "player:1")).strip() or "player:1"
+    player_id = _norm_player_id(body.get("player_id"))
     code = str(body.get("code") or body.get("authorization_code") or "").strip()
     # 1) 交换 token
     tok = await game_server.oauth.exchange(code)
@@ -2358,7 +2554,11 @@ async def ai_test(request: Request):
     """设置页真实 Agent 探针：发送最小请求，不写入对局事件。"""
     cfg = ingest_api_headers(request)
     probe = None
-    if cfg.get("zhihu_secret"):
+    # 面板三件套齐全 = 用户显式指定自建端点（如 DeepSeek）→ 探针/对局都
+    # 优先走 main，不被残留的知乎 Secret 抢占（否则测的/用的都不是用户填的）。
+    has_panel_main = bool(cfg.get("llm_key") and cfg.get("llm_base")
+                          and cfg.get("llm_model"))
+    if cfg.get("zhihu_secret") and not has_panel_main:
         key = cfg.get("llm_key") or cfg.get("zhihu_secret") or os.environ.get("LLM_API_KEY", "")
         base = cfg.get("llm_base") or os.environ.get("LLM_BASE_URL", "")
         model = cfg.get("llm_model") or os.environ.get("LLM_MODEL", "")
@@ -2370,15 +2570,11 @@ async def ai_test(request: Request):
         if cfg.get("llm_key") and cfg.get("llm_base") and cfg.get("llm_model"):
             # 面板三件套（如 DeepSeek 等自建 OpenAI 兼容端点）：用面板凭证
             # 构造临时实例探针，不写进程 env（避免污染其他对局的回落通道）。
+            # use_credentials 锁定实例凭证——chat 内部 _sync_env 不得用进程
+            # env 静默顶替（否则探针打的不是用户填的端点，结果失真）。
             from agents.llm_client import LLMClient as _LC, OpenAICompatProvider as _OP
             _p = _OP()
-            _p.api_key = cfg["llm_key"]
-            _p.base_url = cfg["llm_base"].rstrip("/")
-            _p.model = cfg["llm_model"]
-            try:
-                _p.timeout = float(os.environ.get("LLM_TIMEOUT") or 60)
-            except ValueError:
-                _p.timeout = 60.0
+            _p.use_credentials(cfg["llm_key"], cfg["llm_base"], cfg["llm_model"])
             probe = _LC(providers={"main": _p, "mock": _LC().providers["mock"]})
             model = cfg["llm_model"]
         else:
@@ -2435,7 +2631,10 @@ async def ai_test(request: Request):
             provider = getattr(probe, "last_provider", "main")
         elapsed_ms = round((time.monotonic() - started) * 1000)
         if not reply or provider in ("mock", "fallback"):
-            raise RuntimeError("接口返回了兜底内容")
+            raise RuntimeError(
+                "接口返回了兜底内容"
+                + (f"（{getattr(probe, 'last_error', '')}）"
+                   if getattr(probe, "last_error", "") else ""))
         # identity_leak：探针命中的话说明该通道此刻会把产品身份说出口——
         # 对局内已有 reply_guard 兜底，此处只如实上报诊断，不改变探针语义。
         return {"ok": True, "provider": provider, "source": "api", "network_request": True,
