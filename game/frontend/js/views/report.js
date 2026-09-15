@@ -247,8 +247,7 @@
       const loadRecommendations = async () => {
         recBusy.value = true; recNotice.value = '';
         try {
-          const cfg = JSON.parse(localStorage.getItem('kanshan_api') || '{}');
-          const h = {}; if (cfg.zhihuSecret) h['X-ZHIHU-SECRET'] = cfg.zhihuSecret;
+          const h = {};
           const r = await fetch('/api/zhihu/recommendations?count=5', {headers:h});
           const j = await r.json(); if (!r.ok || !j.ok) throw new Error(j.notice || '推荐接口失败');
           recommendations.value = j.data || [];

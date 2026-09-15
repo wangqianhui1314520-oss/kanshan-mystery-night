@@ -59,7 +59,7 @@
       apiForm.llmBase = apiForm.llmBase || 'https://developer.zhihu.com/v1';
       apiForm.llmKey = apiForm.llmKey || '';
       apiForm.llmModel = apiForm.llmModel || 'zhida-agent';
-      apiForm.zhihuSecret = apiForm.zhihuSecret || '';
+      delete apiForm.zhihuSecret; /* Secret 已下线：知乎凭证只走服务端 env，清掉历史本地残留 */
       const ACH_IMG = {
         '看山还是山': '/assets/images/ach_mountain.png',
         '心晴医师': '/assets/images/ach_heart_doctor.png',
@@ -128,7 +128,7 @@
 
       const recheckEngine = async () => {
         await UX.probeEngine();
-        if (apiForm.llmKey || apiForm.zhihuSecret) {
+        if (apiForm.llmKey) {
           window.Store.toast('正在发送知乎 Agent 测试请求…', '');
           const ok = await UX.testAi();
           window.Store.toast(ok ? '知乎 Agent 测试成功' : '知乎 Agent 测试失败，请查看健康说明', ok ? 'good' : 'warn');
@@ -1266,7 +1266,6 @@
               <option value="deepseek-chat">deepseek-chat · V3 兼容</option>
               </optgroup>
             </select></label>
-              <label>知乎 Secret<input v-model="apiForm.zhihuSecret" type="password" placeholder="Access Secret（可选）"></label>
               <button class="btn primary sm" @click="saveApi">保存 API 配置</button>
               <p class="dim tiny">仅存本机；建局时传入服务端内存，密钥不落盘。</p>
             </div></div>

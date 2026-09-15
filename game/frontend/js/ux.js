@@ -84,7 +84,6 @@
         if (cfg.llmBase) headers['X-LLM-BASE'] = cfg.llmBase;
         if (cfg.llmKey) headers['X-LLM-KEY'] = cfg.llmKey;
         if (cfg.llmModel) headers['X-LLM-MODEL'] = cfg.llmModel;
-        if (cfg.zhihuSecret) headers['X-ZHIHU-SECRET'] = cfg.zhihuSecret;
       } catch (e) { /* 本地存储不可用时仍执行无凭证探针 */ }
       const res = await fetch(url, {cache: 'no-store', headers, signal: controller.signal});
       if (!res || !res.ok) throw new Error('HTTP ' + ((res && res.status) || '—'));
@@ -113,7 +112,6 @@
       if (cfg.llmBase) headers['X-LLM-BASE']=cfg.llmBase;
       if (cfg.llmKey) headers['X-LLM-KEY']=cfg.llmKey;
       if (cfg.llmModel) headers['X-LLM-MODEL']=cfg.llmModel;
-      if (cfg.zhihuSecret) headers['X-ZHIHU-SECRET']=cfg.zhihuSecret;
       const r = await fetch('/api/ai/test',{method:'POST',headers,body:'{}'});
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || '请求失败');

@@ -22,7 +22,7 @@
       const officialHot = ref([]), hotBusy = ref(false), hotNotice = ref('');
       const loadOfficialHot = async () => {
         hotBusy.value = true; hotNotice.value = '';
-        try { const cfg=JSON.parse(localStorage.getItem('kanshan_api')||'{}'); const h={}; if(cfg.zhihuSecret)h['X-ZHIHU-SECRET']=cfg.zhihuSecret;
+        try { const h={};
           const r=await fetch('/api/zhihu/hot-list?limit=20',{headers:h}), j=await r.json(); if(!r.ok||!j.ok)throw new Error(j.notice||'热榜接口失败');
           const d=j.data||{}; officialHot.value=d.items||d.Data||d.data||[];
         } catch(e){hotNotice.value=e.message;} finally{hotBusy.value=false;}

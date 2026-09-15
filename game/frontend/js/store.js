@@ -3074,7 +3074,6 @@
       if (apiCfg.llmBase) hdrs['X-LLM-BASE'] = apiCfg.llmBase;
       if (apiCfg.llmKey) hdrs['X-LLM-KEY'] = apiCfg.llmKey;
       if (apiCfg.llmModel) hdrs['X-LLM-MODEL'] = apiCfg.llmModel;
-      if (apiCfg.zhihuSecret) hdrs['X-ZHIHU-SECRET'] = apiCfg.zhihuSecret;
       return hdrs;
     },
     async requestAiWave(opts) {

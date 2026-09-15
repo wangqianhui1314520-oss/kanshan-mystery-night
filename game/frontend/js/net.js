@@ -117,7 +117,6 @@
           if (apiCfg.llmBase) hdrs['X-LLM-BASE'] = apiCfg.llmBase;
           if (apiCfg.llmKey) hdrs['X-LLM-KEY'] = apiCfg.llmKey;
           if (apiCfg.llmModel) hdrs['X-LLM-MODEL'] = apiCfg.llmModel;
-          if (apiCfg.zhihuSecret) hdrs['X-ZHIHU-SECRET'] = apiCfg.zhihuSecret;
           const r = await fetch(base + '/api/session', { method: 'POST', headers: hdrs, body: JSON.stringify({ mode: 'main', player_id: this.playerId }) });
           /* 服务端 /api/session 返回的是嵌套结构 { ok, session: { session_id, engine, ... } }。
              只读顶层 session_id/id 会拿到 undefined，拼出的 WS 地址会变成 /ws/undefined，
