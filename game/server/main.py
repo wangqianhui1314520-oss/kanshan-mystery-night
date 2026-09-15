@@ -267,6 +267,10 @@ class GameServer:
         key = cfg.get("llm_key") or os.environ.get("LLM_API_KEY") or ""
         base = (cfg.get("llm_base") or os.environ.get("LLM_BASE_URL") or "").rstrip("/")
         model = cfg.get("llm_model") or os.environ.get("LLM_MODEL") or ""
+        # 自建端点三件套是否由 cfg/env 直接配齐（必须在下方"知乎回退填充"之前
+        # 判定）：否则缺 LLM_MODEL 时会被回退成知乎直答端点，LLM_PRIMARY=main
+        # 会把官方通道误当成自建端点启用。
+        custom_complete = bool(key and base and model)
         # 比赛统一要求：无论设置面板是否残留自定义模型配置，均优先使用知乎官方 Agent。
         zhihu_secret = (cfg.get("zhihu_secret") or os.environ.get("ZHIHU_APP_KEY")
                         or os.environ.get("ZHIHU_ACCESS_SECRET") or "")
@@ -286,18 +290,27 @@ class GameServer:
                 model = cfg.get("llm_model") or os.environ.get("ZHIHU_LLM_MODEL", "zhida-agent")
         if not (key and base and model):
             return None
+        # LLM_PRIMARY=main：.env 三件套齐全且显式指定 main 时，自建 LLM 升为
+        # 对局主通道（NPC/DM/AI 坐席全量走它）。默认不设 → 维持比赛默认语义
+        # （知乎官方 Agent 优先），自建 LLM 仅作降级备份。
+        prefer_main = os.environ.get("LLM_PRIMARY", "").strip().lower() == "main"
+        force_main = prefer_main and custom_complete
         panel_main = bool(cfg.get("llm_key") and cfg.get("llm_base")
                           and cfg.get("llm_model"))
         try:
             from agents.llm_client import (LLMClient, OpenAICompatProvider,
                                            MockProvider, ZhidaProvider)
-            if panel_main:
+            if panel_main or force_main:
                 # 用户在面板显式指定自建端点（如 DeepSeek）→ 本对局 AI 全量走
                 # main 通道：不注册 zhida 槽位，call_gateway(provider="zhida")
                 # 经 _pick 降级自然落 main——否则 env 里的知乎凭证恒可用、
                 # zhida 恒优先，面板配置永远不会生效（用户实测复现的根因）。
+                # force_main 走同一条路径：.env 里把 LLM_PRIMARY 设为 main，
+                # 等价于"服务器级面板配置"，凭证取自上方 cfg/env 回退链。
+                _key, _base, _model = ((cfg["llm_key"], cfg["llm_base"], cfg["llm_model"])
+                                       if panel_main else (key, base, model))
                 prov = OpenAICompatProvider()
-                prov.use_credentials(cfg["llm_key"], cfg["llm_base"], cfg["llm_model"])
+                prov.use_credentials(_key, _base, _model)
                 return LLMClient(providers={"main": prov, "mock": MockProvider()})
             # zhida/main 双槽显式注入（值 = 上方 cfg/env 回退链计算结果，与
             # 旧版"先写 env 再快照"的行为逐字段等价），凭证不落进程 env。
@@ -2883,6 +2896,12 @@ async def ai_test(request: Request):
     """设置页真实 Agent 探针：发送最小请求，不写入对局事件。"""
     cfg = ingest_api_headers(request)
     probe = None
+    # 先用 env 默认值兜住 key/base/model：面板可能同时携带自建三件套与知乎
+    # Secret，此时走 panel-main 分支不再赋值，下面 os.environ.update(...) 会
+    # UnboundLocalError（实测 500）。默认值只用于回写 env，不改变探针语义。
+    key = os.environ.get("LLM_API_KEY", "")
+    base = os.environ.get("LLM_BASE_URL", "")
+    model = os.environ.get("LLM_MODEL", "")
     # 面板三件套齐全 = 用户显式指定自建端点（如 DeepSeek）→ 探针/对局都
     # 优先走 main，不被残留的知乎 Secret 抢占（否则测的/用的都不是用户填的）。
     has_panel_main = bool(cfg.get("llm_key") and cfg.get("llm_base")
