@@ -35,7 +35,14 @@
         window.Store.send('skill', { kind: 'unlock_office', code: code });
       };
 
-      const onClue = (evt) => { lastGain.value = evt.payload; flip.value = false; setTimeout(() => flip.value = true, 60); };
+      const onClue = (evt) => {
+        const p = evt && evt.payload || {};
+        if (evt && evt.actor && String(evt.actor).startsWith('player:') && evt.actor !== S.playerId) return;
+        if (evt && window.Store && window.Store.state && evt.actor && (String(evt.actor).startsWith('ai:') || String(evt.actor).startsWith('player:ai:'))) return;
+        const clue = window.Store.clueById ? window.Store.clueById(p.clue_id) : null;
+        lastGain.value = Object.assign({}, p, clue ? { name: clue.name, text: p.text || clue.fact, tags: clue.tags, tier: clue.tier } : {});
+        flip.value = false; setTimeout(() => flip.value = true, 60);
+      };
       const onSearch = (evt) => {
         const p = evt && evt.payload || {};
         if (!openLoc.value || (p.location && p.location !== openLoc.value.id && p.location !== openLoc.value.name)) return;

@@ -79,7 +79,7 @@ def test_fetch_story_detail_parses(tmp_path, monkeypatch):
 
 
 def test_fetch_story_url_contract(tmp_path, monkeypatch):
-    """详情路径必须是 story/{work_id}（knowledge 详情共用，不得发明新路径）。"""
+    """故事与知识详情必须分别使用各自的官方详情路径。"""
     captured = {}
 
     def fake_request(url, headers=None):
@@ -91,7 +91,8 @@ def test_fetch_story_url_contract(tmp_path, monkeypatch):
     assert captured["url"] == \
         "https://api.zhihu.com/km-indep-home/hackathon/v2/story/w1"
     zb.fetch_work("w1", kind="knowledge", cache_dir=tmp_path)
-    assert captured["url"].endswith("/story/w1")
+    assert captured["url"] == \
+        "https://api.zhihu.com/km-indep-home/hackathon/v2/knowledge/w1"
 
 
 def test_fetch_knowledge_list_parses(tmp_path, monkeypatch):

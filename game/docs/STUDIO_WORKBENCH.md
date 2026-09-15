@@ -102,17 +102,29 @@ id, status, tier, seed, world, detail, acts, gate, provider, scenario_dir, creat
 ```
 POST /api/studio/generate
   body: { "seed": str, "tier": "demo", "use_llm": bool, "inner_boss": false }
-  → 200 { "ok": true, "job": <job 去 detail.memories 可保留>, "notice": str }
-  种子空 → 400
+  → 202 { "ok": true, "job_id": str, "scenario_id": null, "status": "running", "notice": str }
+  任务只在后台线程执行；客户端不得等待本次 POST 返回完整 job。
+  种子空 → 400；tier 非法 → 400
+
+GET  /api/studio/jobs/{job_id}
+  → 200 { "ok": true, "job": { "job_id": str, "status": "running|ready|failed", ... } }
+  `status=running` 继续轮询；`ready` 才能进入试玩；`failed` 返回 `error` 且禁止开局。
+  任务完成后 `job` 是作者视图的精简响应（去掉 `detail.memories`），完整版本仍由下方作者接口读取。
+  任务不存在 → 404；服务重启后仍可用 `gen_*` 的 `scenario_id` 回查磁盘 job。
 
 GET  /api/studio
-  → { "ok": true, "items": list_jobs() }
+  → { "ok": true, "items": list_jobs(), "presets": [...] }
+
+GET  /api/studio/catalog
+  → { "ok": true, "items": [{ "scenario_id": str, "title": str, "status": str, ... }] }
 
 GET  /api/studio/{id}
   → { "ok": true, "job": load_job(id) }   404 if missing
+  这是作者视图：包含完整 `world/detail/acts/gate/status`，其中 `detail` 可含角色秘密与记忆稿。
 
 GET  /api/studio/{id}/public
   → { "ok": true, "pack": public_snapshot(id) }   仅 ready 可开玩；failed 仍 200 但 pack.playable=false
+  这是试玩水合包：只含前端可见字段，不得用来读取作者真相或闭卷秘密。
 
 POST /api/session
   新增可选字段 scenario_id（缺省 kanshan）
@@ -121,6 +133,21 @@ POST /api/session
 ```
 
 `GameServer` 默认目录仍是 kanshan。启动探活继续装载 kanshan。只在 **session 级** 换目录。
+
+### Windows 调用约定
+
+Windows `cmd.exe` / PowerShell 不保证能正确解析带嵌套引号、换行和中文的 `curl -d`。统一使用项目内 Python 客户端，客户端会自行编码 UTF-8 JSON，并强制直连本机 loopback：
+
+```text
+cd game
+python tools/studio_request.py catalog
+python tools/studio_request.py generate --seed "深夜自习室，所有课本一夜之间变成空白"
+python tools/studio_request.py job gen_xxx
+python tools/studio_request.py public gen_xxx
+python tools/studio_request.py session --scenario-id gen_xxx --mode quick
+```
+
+默认服务地址是 `http://127.0.0.1:8899`。远程服务用 `--base https://你的域名`；不要把远程地址改写成 `127.0.0.1`。
 
 ---
 

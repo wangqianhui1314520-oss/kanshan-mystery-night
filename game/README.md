@@ -47,8 +47,8 @@ game/
 
 ```bash
 pip install -r requirements.txt
-uvicorn server.main:app --reload     # 后端
-# 浏览器访问 http://127.0.0.1:8000/（不要直接双击 frontend/index.html）
+uvicorn server.main:app --reload --port 8899     # 后端
+# 浏览器访问 http://127.0.0.1:8899/（不要直接双击 frontend/index.html）
 ```
 
 前端图片、视频和音频统一使用 `/assets/...` 绝对路径，由 FastAPI 将它映射到

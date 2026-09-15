@@ -106,8 +106,25 @@
       const transportSource = computed(() => (S.netKind === 'ws' ? 'WebSocket 实时通道' : S.netKind === 'mock' ? '未开局 · 开局后自动连接服务器' : S.netKind === 'error' ? '连接失败' : '尚未连接对局'));
       const connText = computed(() => ({
         reconnecting: '⟳ 正在重连档案局…' + (conn.attempts ? '（第 ' + conn.attempts + ' 次）' : ''),
-        offline: '⚠ 实时通道已断开，请重连后确认对局状态'
+        offline: conn.note || '⚠ 实时通道已断开，请重连后确认对局状态',
+        restoring: '↻ 通道已恢复，正在恢复你的角色席位…',
+        restored: '✓ 通道与角色席位均已恢复'
       }[conn.state] || ''));
+      const restorePartyAfterReconnect = async () => {
+        if (!S.mode || S.mode !== 'party' || S.isSpectator) return true;
+        conn.state = 'restoring'; conn.note = '通道已恢复，正在恢复你的角色席位…';
+        const ok = await window.Store.restorePartySeat();
+        if (ok) {
+          conn.state = 'restored'; conn.note = '通道与角色席位均已恢复';
+          window.Store.toast('已恢复你的角色席位，AI 接管已解除', 'good');
+          setTimeout(() => { if (conn.state === 'restored') conn.state = 'online'; }, 1800);
+          return true;
+        }
+        conn.state = 'offline';
+        conn.note = '通道已恢复，但角色仍由 AI 接管；点击“重新入房”恢复席位';
+        window.Store.toast('实时通道已恢复，但角色仍由 AI 接管，请重新入房', 'warn');
+        return false;
+      };
 
       const recheckEngine = async () => {
         await UX.probeEngine();
@@ -118,7 +135,13 @@
         }
         window.Store.toast(eng.label, eng.probe === 'ok' ? 'good' : 'warn');
       };
-      const retryConn = () => {
+      const retryConn = async () => {
+        /* 自动重连后 WS 可能已在线但席位恢复失败；此时直接重试 /join，
+           不再调用一个“已在线所以什么都不做”的 retryNow。 */
+        if (S.mode === 'party' && conn.note.indexOf('角色仍由 AI') >= 0) {
+          await restorePartyAfterReconnect();
+          return;
+        }
         if (!window.Net.retryNow()) UX.probeEngine();
       };
       /* 首屏自动引导（单人自助：没人讲解流程，只能靠它） */
@@ -260,7 +283,13 @@
       async function boot() {
         UX.probeEngine();
         window.__connStatusHook = (st) => {
-          conn.state = st.state; conn.attempts = st.attempts || 0; conn.note = st.note || '';
+          conn.attempts = st.attempts || 0;
+          conn.note = st.note || '';
+          if (st.state === 'online' && st.reconnected) {
+            restorePartyAfterReconnect();
+          } else {
+            conn.state = st.state;
+          }
           if (st.state === 'online') UX.probeEngine({ silent: true });
         };
         let roomParam = new URLSearchParams(location.search).get('room');
@@ -323,10 +352,12 @@
           window.Store.toast('该机制将在后续章节解锁 · 当前请按本章目标推进', 'warn');
           return;
         }
-        if (id === 'map' && S.studioNeedAdvance) {
-          window.Store.toast('先结束破冰——圆桌点「开始搜证」', 'warn');
-          S.view = 'chat';
-          return;
+        if (id === 'map' && S.stage === 'break_ice') {
+          if (window.Store.iceBlocksSearch && window.Store.iceBlocksSearch()) {
+            window.Store.toast('先完成 DM 破冰，再点击「开始搜证」', 'warn');
+            S.view = 'chat';
+            return;
+          }
         }
         if (id === 'map' && S.act === 1 && S.round === 1 && !S.skipIce && S.playMode !== 'daily' && S.playMode !== 'quick'
             && !Object.keys(S.searched || {}).length && !S.scenarioId) {
@@ -426,11 +457,22 @@
       /* V5：章末「进入下一章 ▸」——advance（引擎门控最终裁决）→ actSet 切章 + 转场 + 前情提要；
        * 章三按钮=进入终局指认（终局结算层入口，不推进幕） */
       const goNextChapter = () => {
+        if (S.busy) return false;
+        /* 破冰结束是第一步推进，不要求先有线索；搜证门槛由服务端在 investigate 阶段裁决。 */
+        if (S.stage === 'break_ice') {
+          if (window.Store.finishStudioBreakIce && window.Store.finishStudioBreakIce() !== false) S.view = 'chat';
+          return false;
+        }
+        if (S.stage === 'investigate' && S.act === 1 && !S.demo && !Object.keys(S.searched || {}).length) {
+          S.view = 'map';
+          return true;
+        }
         const p = prog.value;
-        if (!p.cleared) { window.Store.toast(p.hint, 'warn'); return; }
-        if (S.act >= 3) { S.view = 'vote'; return; }
-        window.Store.send('advance', {});
-        S.view = 'chat';
+        if (!p.cleared) { window.Store.toast(p.hint, 'warn'); return false; }
+        if (S.act >= 3) { S.view = 'vote'; return true; }
+        const ok = window.Store.send('advance', S.demo ? { demo_bypass: true } : {});
+        if (ok !== false) S.view = 'chat';
+        return ok !== false;
       };
       const hostAdvance = () => { if (S.isHost && !S.busy) goNextChapter(); };
 
@@ -457,11 +499,20 @@
         return (M.chars || []).filter(x => x.id !== 'dm').map(c => {
           const seat = seats.find(s => s && s.char_id === c.id) || {};
           const owner = seat.player_id || '';
+          const mineSeat = owner === mine || S.partyChar === c.id;
           const taken = !!(owner && owner !== mine && seat.is_ai === false);
+          let status = 'empty', statusLabel = '可领取';
+          if (seat.ai_takeover) { status = 'takeover'; statusLabel = 'AI 接管'; }
+          else if (seat.is_ai && owner) { status = 'takeover'; statusLabel = 'AI 接管'; }
+          else if (seat.is_ai && !owner) { status = 'ai'; statusLabel = 'AI 补位'; }
+          else if (seat.connected === true) { status = mineSeat ? 'mine' : 'online'; statusLabel = mineSeat ? '你的席位 · 在线' : '真人在线'; }
+          else if (owner) { status = 'offline'; statusLabel = '暂离'; }
           return Object.assign({}, c, {
             taken: taken,
-            mine: owner === mine || S.partyChar === c.id,
-            pending: !!(roomLife.npcPending && roomLife.npcPending === c.id)
+            mine: mineSeat,
+            pending: !!(roomLife.npcPending && roomLife.npcPending === c.id),
+            status: status,
+            statusLabel: statusLabel
           });
         });
       });
@@ -608,13 +659,20 @@
       <div class="card menu" v-if="S.phase === 'menu'">
         <h1>求真档案局 · 看山失踪夜</h1>
         <p class="sub">知乎黑客松 2026 · AI 原生欢乐阵营机制推理本</p>
-        <div class="ai-status-card" role="status" aria-live="polite">
-          <strong>{{ ai.label }}</strong><span>{{ ai.provider }}</span>
+        <div class="ai-status-card" :class="{ missing: ai.state === 'missing', ready: ai.state === 'configured' || ai.state === 'success' }" role="status" aria-live="polite">
+          <div class="ai-status-head"><strong>{{ ai.label }}</strong><span>{{ ai.provider }}</span></div>
           <p>{{ ai.detail }}</p>
-          <button class="btn ghost sm" type="button" @click="recheckEngine">重新检测</button>
-          <button class="btn ghost sm" type="button" @click="settings=true; settingsAdv=true">AI 设置与席位</button>
+          <p class="ai-playable-note" v-if="ai.state === 'missing'">规则引擎仍可正常裁决；AI 对话未配置时，角色不会生成实时回复。</p>
+          <div class="ai-status-actions">
+            <button class="btn ghost sm" type="button" @click="recheckEngine">重新检测</button>
+            <button class="btn ghost sm" type="button" @click="settings=true; settingsAdv=true">配置 AI</button>
+          </div>
         </div>
         <p class="dm-line">周五盘点夜。21:00，首席荣誉侦探<b>刘看山</b>进档案室后失踪。大门横幅亮起——【不出真相，不出此门】。23:00，封控确认，调查开始。</p>
+        <section class="menu-primary-actions" aria-label="开始游戏">
+          <button v-if="S.hasSave" class="btn-start alt" @click="Store.resumeGame()">继续上次对局 ▸</button>
+          <button class="btn-start" @click="Store.chooseMode('solo')">开 始 调 查</button>
+        </section>
         <section class="core-loop-card" aria-label="游戏核心循环">
           <div class="core-loop-head"><b>一局怎么玩</b><span>每次行动都让真相更近一步</span></div>
           <div class="core-loop-steps">
@@ -634,10 +692,10 @@
           <div><b>任务卡已更新</b><span>本幕任务 · 私密提醒 · 整活建议</span></div>
           <p>领取角色后，在「目标卡」查看自己的本幕任务。房间创建者可打开「主持人」工具。</p>
         </section>
-        <button v-if="S.hasSave" class="btn-start alt" @click="Store.resumeGame()">继续上次对局 ▸</button>
-        <button class="btn-start" @click="Store.chooseMode('solo')">开 始 调 查</button>
-        <button class="btn-start studio-entry" @click="Store.openStudio()">创作一本新剧本 ▸</button>
-        <button class="btn-start alt shelf-entry" @click="shelfToggle">{{ shelfOpen ? '收起我的剧本架 ▴' : '我的剧本架 ▾' }}</button>
+        <section class="menu-create-actions" aria-label="创作与剧本">
+          <button class="btn-start studio-entry" @click="Store.openStudio()">创作一本新剧本 ▸</button>
+          <button class="btn-start alt shelf-entry" @click="shelfToggle">{{ shelfOpen ? '收起我的剧本架 ▴' : '我的剧本架 ▾' }}</button>
+        </section>
         <section class="menu-shelf" v-if="shelfOpen" aria-label="我的剧本架">
           <p class="dim tiny" v-if="shelfState === 'loading'">正在拉取剧本架…</p>
           <p class="dim tiny" v-else-if="shelfState === 'offline'">需在线服务端可用后加载剧本架 <a href="#" @click.prevent="loadShelf">重试</a></p>
@@ -657,23 +715,31 @@
             </div>
           </template>
         </section>
-        <div class="menu-modes">
-          <button class="btn-start alt" @click="Store.chooseMode('daily')">每日挑战</button>
-          <button class="btn-start alt" @click="Store.chooseMode('quick')">快速局</button>
-        </div>
-        <p class="dim tiny judge-hint">单人评委线约 20 分钟 · <a href="#" @click.prevent="Store.startJudgeDemo()">直达对照→回声→法官→画像</a></p>
-        <details class="menu-more">
-          <summary>更多玩法</summary>
-          <button class="btn-start alt" @click="Store.chooseMode('party')">房间模式（2-5 人）</button>
-        </details>
+        <section class="menu-modes" aria-label="更多玩法">
+          <div class="menu-section-head"><b>更多玩法</b><span>短局、联机与挑战</span></div>
+          <div class="menu-mode-grid">
+            <button class="btn-start alt" @click="Store.chooseMode('daily')"><b>每日挑战</b><small>跟着今日热榜办案</small></button>
+            <button class="btn-start alt" @click="Store.chooseMode('quick')"><b>快速局</b><small>跳过破冰，直接搜证</small></button>
+          </div>
+          <button class="btn-start party-entry" @click="Store.chooseMode('party')">
+            <b>房间模式（2-5 人）</b><small>邀请好友 · AI 补位 · 实时同步</small>
+          </button>
+        </section>
+        <section class="menu-judge-entry" aria-label="评委演示线">
+          <span><b>评委演示线</b><small>约 20 分钟 · 对照 → 回声 → 法官 → 画像</small></span>
+          <button class="btn ghost sm" type="button" @click="Store.startJudgeDemo()">直达对照 ▸</button>
+        </section>
         <button class="btn-skip" @click="Store.enterBureau()">跳过登录 · 直接进入（实习侦探证）</button>
-        <div class="menu-sub">
-          <button @click="settings=true">⚙ 设置</button>
-          <button @click="achOpen=true">🏆 成就</button>
-          <button @click="helpOpen=true">❓ 玩法说明</button>
-          <button @click="aboutOpen=true">ℹ 关于</button>
-        </div>
-        <p class="dim tiny">v4.0 · 求真档案局项目组 · 知乎登录后解锁：真名侦探证 / 知乎头像 / 个性化台词</p>
+        <details class="menu-utility">
+          <summary>设置与帮助</summary>
+          <div class="menu-sub" aria-label="设置与帮助">
+            <button type="button" @click="settings=true">设置</button>
+            <button type="button" @click="achOpen=true">成就</button>
+            <button type="button" @click="helpOpen=true">玩法说明</button>
+            <button type="button" @click="aboutOpen=true">关于</button>
+          </div>
+        </details>
+        <p class="dim tiny menu-version">v4.0 · 求真档案局项目组 · 知乎登录后解锁：真名侦探证 / 知乎头像 / 个性化台词</p>
       </div>
 
       <!-- 房间模式 -->
@@ -689,12 +755,12 @@
         <button class="btn-start alt" v-if="S.roomFull" @click="Store.joinRoom(S.roomFull.code, {spectator:true})">房间已满 · 观战旁听</button>
         <div class="room-share" v-if="S.roomCode">
           <p class="dim tiny">房间码：<b style="font-size:1.4em;letter-spacing:2px;">{{ S.roomCode }}</b></p>
-          <p class="dim tiny">同一 WiFi 的好友，用下面的链接直接打开即可进房：</p>
+          <p class="dim tiny share-note"><b>同一 WiFi 可直接打开</b>下面的链接；跨网段/公网环境请使用已部署的 HTTPS 地址。</p>
           <div class="room-join">
-            <input :value="S.shareUrl" readonly onclick="this.select()" style="flex:1;font-size:12px;">
+            <input :value="S.shareUrl" readonly aria-label="房间分享链接" onclick="this.select()" style="flex:1;font-size:12px;">
             <button class="btn-start alt" @click="copyShare">复制链接</button>
           </div>
-          <p class="dim tiny">或让好友在本页输入房间码加入；好友到齐后各自选人，点击开始进入序章。</p>
+          <p class="dim tiny">也可以让好友输入 6 位房间码。好友到齐后，各自领取角色，再进入序章。</p>
         </div>
         <button class="btn-skip" @click="Store.chooseMode('solo')">返回单人模式</button>
       </div>
@@ -707,15 +773,22 @@
         <template v-if="S.studioBooks && S.studioBooks.length">
           <h1>领取今晚的故事本</h1>
           <p class="sub">点开一张角色卡，领取仅你可见的一页任务。确认后进入序章。</p>
-          <div class="gallery pb-gallery">
+          <div class="gallery pb-gallery" :aria-busy="!!S.studioBookLoading">
             <div class="g-card pb-cover" v-for="b in seatBookChars" :key="b.char_id"
-                 :class="{ on: S.partyChar === b.char_id }" @click="Store.pickStudioChar(b.char_id)">
+                 :class="{ on: S.partyChar === b.char_id, loading: S.studioBookLoading === b.char_id }"
+                 :aria-disabled="!!S.studioBookLoading"
+                 @click="!S.studioBookLoading && Store.pickStudioChar(b.char_id)">
               <img :src="b.avatar" :alt="b.name">
               <b>{{ b.name }}</b>
               <span>{{ b.archetype }}</span>
               <p class="pb-you">{{ b.you_are }}</p>
+              <em v-if="S.studioBookLoading === b.char_id" class="pb-loading">故事本领取中…</em>
             </div>
           </div>
+          <p v-if="S.studioBookLoading" class="dim tiny pb-loading-note" role="status" aria-live="polite">
+            正在读取「{{ S.studioBookLoading }}」的私密故事本，请稍候；领取完成后即可进入序章。
+          </p>
+          <p v-else-if="S.studioBookError" class="dim tiny pb-loading-note" role="alert">{{ S.studioBookError }}</p>
           <article class="pb-sheet seat-identity-only" v-if="S.playerBook">
             <header class="pb-hd">
               <span class="pb-tag">角色已领取</span>
@@ -725,7 +798,7 @@
             <section class="pb-sec"><h3>你是谁</h3><p>{{ S.playerBook.you_are }}</p></section>
             <p class="dim tiny">任务、秘密和关系将在进入剧情后逐步解锁。</p>
           </article>
-          <button class="btn-start" @click="Store.startPrologue()">确 认 · 进 入 序 章 ▸</button>
+          <button class="btn-start" :disabled="!!S.studioBookLoading || !S.playerBook" @click="Store.startPrologue()">{{ S.studioBookLoading ? '故事本领取中…' : (S.playerBook ? '确 认 · 进 入 序 章 ▸' : '先领取一本故事本') }}</button>
         </template>
         <template v-else>
           <h1>{{ showSeatRoles ? '领取今晚身份' : '选择你的形象' }}</h1>
@@ -750,8 +823,8 @@
                       :class="{ on: S.partyChar === c.id, taken: c.taken }"
                       :disabled="c.taken" @click="Store.pickPartyChar(c.id)">
                 <img :src="c.avatar" :alt="c.name"><b>{{ c.name }}</b>
-                <span v-if="c.taken">已被领取</span>
-                <em v-else-if="c.pending" class="seat-npc-pending">AI 补位中…</em>
+                <span class="seat-status" :class="'seat-status-' + c.status">{{ c.statusLabel }}</span>
+                <em v-if="c.pending" class="seat-npc-pending">AI 补位中…</em>
                 <em v-if="soulMatchId === c.id" style="display:block;color:#ffd76a;font-size:11px;font-style:normal;">★ 灵魂同频 · 推荐你选 TA</em>
               </button>
             </div>
@@ -769,7 +842,7 @@
             <input :value="S.shareUrl" readonly onclick="this.select()" style="flex:1;font-size:12px;">
             <button class="btn-start alt" @click="copyShare">复制链接</button>
           </div>
-          <button class="btn-start" :disabled="showSeatRoles && !S.partyChar" @click="Store.startPrologue()">{{ showSeatRoles && !S.partyChar ? '先点一名角色' : '确 认 · 进 入 序 章 ▸' }}</button>
+          <button class="btn-start" :disabled="(showSeatRoles && !S.partyChar) || !!S.studioBookLoading" @click="Store.startPrologue()">{{ S.studioBookLoading ? '故事本领取中…' : (showSeatRoles && !S.partyChar ? '先点一名角色' : '确 认 · 进 入 序 章 ▸') }}</button>
         </template>
       </div>
 
@@ -900,10 +973,10 @@
       <div class="ux-busybar" v-if="S.busy" role="status" aria-live="polite"><i></i><span>正在核对行动结果…</span></div>
 
       <!-- WS 实时通道：重连 / 断线反馈 -->
-      <div class="ux-conn" :class="conn.state" v-if="conn.state === 'reconnecting' || conn.state === 'offline'" role="status" aria-live="polite">
-        <i class="uxs-spin" v-if="conn.state === 'reconnecting'" aria-hidden="true"></i>
+      <div class="ux-conn" :class="conn.state" v-if="conn.state === 'reconnecting' || conn.state === 'offline' || conn.state === 'restoring' || conn.state === 'restored'" role="status" aria-live="polite">
+        <i class="uxs-spin" v-if="conn.state === 'reconnecting' || conn.state === 'restoring'" aria-hidden="true"></i>
         <span>{{ connText }}</span>
-        <button type="button" @click="retryConn">立即重连</button>
+        <button type="button" @click="retryConn" v-if="conn.state !== 'restored'">{{ conn.state === 'offline' && S.mode === 'party' ? '重新入房' : '立即重连' }}</button>
       </div>
 
       <!-- 房间生命周期提示：AI 演出占位（npc_pending）/ 圆桌流程错误（rt_flow_error） -->

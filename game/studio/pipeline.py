@@ -13,6 +13,7 @@ from .paths import SCENARIOS, job_path, scenario_dir
 from .player_book import list_covers, load_book
 from .snapshot import public_snapshot
 from .tiers import TIERS
+from .ir import stable_hash
 from .validate import validate_dir
 
 
@@ -47,7 +48,13 @@ def generate(seed: str, *, tier: str = "demo", use_llm: bool = False,
 
     world, detail, acts = bibles["world"], bibles["detail"], bibles["acts"]
     apply_brief(world, detail, acts, brief_n)
-    sid = make_scenario_id(world.get("title") or "pack", seed)
+    # Include the normalized brief in the deterministic id. Different pack
+    # types/locations must never overwrite one another's compiled scenario.
+    sid = make_scenario_id(
+        world.get("title") or "pack",
+        composed,
+        variant=stable_hash(brief_n),
+    )
     compile_bibles(world, detail, acts, scenario_id=sid)
     from .player_book import build_books
     detail["player_books"] = build_books(world, detail, acts)

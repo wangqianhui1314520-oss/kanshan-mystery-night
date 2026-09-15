@@ -17,6 +17,34 @@ pytestmark = pytest.mark.party
 CULPRIT = "char_01"
 
 
+class TestDemoAndCanonicalGate:
+    def test_party_canonical_clue_028_unlocks_first_advance(self):
+        d = EngineDriver(SCENARIO_DIR)
+        s = d.create_session("party", "player:1", "s_party_clue028_gate")
+        d.join_seat("player:1")
+        d.apply_action(s, "advance", "player:1", {})
+        ev, err = d.apply_action(s, "search", "player:1", {"location": "看山工位", "keyword": "鱼干"})
+        assert err is None
+        assert "clue_028" in s["clues_gained"]
+        ev, err = d.apply_action(s, "advance", "player:1", {})
+        assert err is None
+        assert s["stage"] == "round_table"
+        assert not any((e.get("payload") or {}).get("event") == "advance_blocked" for e in ev)
+
+    def test_demo_bypass_requires_handshake_and_flag(self):
+        d = EngineDriver(SCENARIO_DIR)
+        s = d.create_session("party", "player:1", "s_party_demo_gate")
+        d.apply_action(s, "advance", "player:1", {})
+        ev, err = d.apply_action(s, "advance", "player:1", {"demo_bypass": True})
+        assert err is None
+        assert any((e.get("payload") or {}).get("event") == "advance_blocked" for e in ev)
+        ev, err = d.apply_action(s, "skill", "player:1", {"skill": "judge_line", "demo_bypass": True})
+        assert err is None and s["demo_bypass"] is True
+        assert s["stage"] == "investigate"
+        ev, err = d.apply_action(s, "advance", "player:1", {"demo_bypass": True})
+        assert err is None and s["stage"] == "round_table"
+
+
 class TestMultiActorSession:
     def test_three_player_join_aggregate_and_finalize(self):
         """3 真人经动作管线入座 → 指认幕 3 票聚合 → 单次终局。"""
@@ -226,6 +254,48 @@ class TestWSRooms:
                 assert snap["payload"]["stage"] == "break_ice"
                 clues = snap["payload"]["clues_gained"]
                 assert "clue_031" in clues, "重连快照未反映已获线索"
+
+    def test_party_ws_snapshot_includes_public_seats(self, tmp_path, monkeypatch):
+        """party 重连首帧必须带脱敏席位，前端可先恢复显示再完成 /join。"""
+        from fastapi.testclient import TestClient
+        import server.main as main_mod
+        monkeypatch.setattr(main_mod, "DATA_DIR", tmp_path / "data")
+        with TestClient(main_mod.app) as client:
+            created = client.post("/api/session", json={
+                "mode": "party", "player_id": "player:host"}).json()["session"]
+            sid, room = created["session_id"], created["room_code"]
+            joined = client.post(f"/api/session/{sid}/join", json={
+                "room_code": room, "player_id": "player:guest", "char_id": "char_05"})
+            assert joined.status_code == 200
+            with client.websocket_connect(f"/ws/{sid}?player_id=player:guest") as ws:
+                snap = json.loads(ws.receive_text())
+                seats = snap["payload"].get("seats")
+                assert isinstance(seats, list) and seats
+                assert any(s.get("player_id") == "player:guest" for s in seats)
+                assert all("faction" not in s for s in seats)
+
+    def test_party_rejoin_clears_ai_takeover(self, tmp_path, monkeypatch):
+        """最后一条 WS 断开后，幂等 /join 必须恢复真人席位。"""
+        from fastapi.testclient import TestClient
+        import server.main as main_mod
+        monkeypatch.setattr(main_mod, "DATA_DIR", tmp_path / "data")
+        with TestClient(main_mod.app) as client:
+            created = client.post("/api/session", json={
+                "mode": "party", "player_id": "player:host"}).json()["session"]
+            sid, room = created["session_id"], created["room_code"]
+            joined = client.post(f"/api/session/{sid}/join", json={
+                "room_code": room, "player_id": "player:guest", "char_id": "char_05"})
+            assert joined.status_code == 200
+            with client.websocket_connect(f"/ws/{sid}?player_id=player:guest") as ws:
+                json.loads(ws.receive_text())
+            dropped = client.get(f"/api/session/{sid}").json()["session"]
+            dropped_seat = next(s for s in dropped["seats"] if s.get("player_id") == "player:guest")
+            assert dropped_seat["ai_takeover"] and dropped_seat["is_ai"]
+            restored = client.post(f"/api/session/{sid}/join", json={
+                "room_code": room, "player_id": "player:guest", "role": "player"})
+            assert restored.status_code == 200
+            restored_seat = next(s for s in restored.json()["seats"] if s.get("player_id") == "player:guest")
+            assert restored_seat["connected"] and not restored_seat["is_ai"]
 
 
 def _party_seated(sid="s_party_knives"):

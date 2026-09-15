@@ -22,6 +22,7 @@ import re
 import time
 import urllib.error
 import urllib.request
+import threading
 from pathlib import Path
 from typing import Iterator
 
@@ -31,13 +32,25 @@ CACHE_DIR = Path(os.environ.get("LLM_CACHE_DIR") or (AGENTS_DIR / "cache"))
 
 _ZHIDA_DEFAULT_URL = "https://developer.zhihu.com/v1/chat/completions"
 
-# 比赛模式（2026-09-14）：知乎直答官方无硬性 QPS 限制——取消本地强制最小
-# 调用间隔（默认 0 = 连续多次调用零等待，支持一席一句的串联调用流）；
-# 官方偶发 429 仍保留短退避自动重试，保证频率限制不中断对话流程。
-# 如需恢复本地节流，可设环境变量 LLM_MIN_INTERVAL（秒）。
+# 上游限流保护：所有真实 Provider 共用进程级单飞锁和最小间隔。
+# 圆桌会把多个席位串联调用；多房间后台 wave 仍可能同时到达这里，
+# 因此仅在 Provider 内部做间隔不够，必须跨会话串行化真实请求。
+# 默认 0.8s，LLM_MIN_INTERVAL=0 可显式关闭（仅压测/本地 stub 建议使用）。
 _LAST_CALL = {"ts": 0.0}
-_MIN_CALL_INTERVAL = float(os.environ.get("LLM_MIN_INTERVAL", "0"))
+_CALL_LOCK = threading.Lock()
+_DEFAULT_MIN_CALL_INTERVAL = 0.8
 _RETRY_DELAYS = (0.8, 1.6, 3.0, 5.0)
+_MAX_RETRY_WAIT = 8.0
+
+
+def _min_call_interval() -> float:
+    raw = os.environ.get("LLM_MIN_INTERVAL")
+    if raw is None or raw == "":
+        return _DEFAULT_MIN_CALL_INTERVAL
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        return _DEFAULT_MIN_CALL_INTERVAL
 
 # 出网强制直连（2026-09-14 压测取证）：Windows 注册表系统代理
 # （ProxyEnable=1）会被 urllib 默认继承（getproxies → 注册表），本机代理
@@ -47,23 +60,28 @@ _STRAIGHT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 def _post_with_rate_limit(req, timeout: float) -> dict:
-    """统一 POST+JSON：本地节流默认关闭；429 快速退避重试（main/zhida 共用）。"""
-    for attempt in range(len(_RETRY_DELAYS) + 1):
-        gap = time.time() - _LAST_CALL["ts"]
-        if gap < _MIN_CALL_INTERVAL:
-            time.sleep(_MIN_CALL_INTERVAL - gap)
-        try:
-            with _STRAIGHT_OPENER.open(req, timeout=timeout) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-            _LAST_CALL["ts"] = time.time()
-            return data
-        except urllib.error.HTTPError as exc:
-            _LAST_CALL["ts"] = time.time()
-            if exc.code == 429 and attempt < len(_RETRY_DELAYS):
-                # 官方限流退避：0.8s→1.6s→3s→5s 自动重试，对话流程不中断
-                time.sleep(_RETRY_DELAYS[attempt])
-                continue
-            raise
+    """统一 POST+JSON，并在进程内串行化真实 Provider 请求。"""
+    with _CALL_LOCK:
+        retry_wait = 0.0
+        for attempt in range(len(_RETRY_DELAYS) + 1):
+            interval = _min_call_interval()
+            gap = time.monotonic() - _LAST_CALL["ts"]
+            if gap < interval:
+                time.sleep(interval - gap)
+            try:
+                with _STRAIGHT_OPENER.open(req, timeout=timeout) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                _LAST_CALL["ts"] = time.monotonic()
+                return data
+            except urllib.error.HTTPError as exc:
+                _LAST_CALL["ts"] = time.monotonic()
+                if exc.code != 429 or attempt >= len(_RETRY_DELAYS):
+                    raise
+                delay = min(_RETRY_DELAYS[attempt], _MAX_RETRY_WAIT - retry_wait)
+                if delay <= 0:
+                    raise
+                retry_wait += delay
+                time.sleep(delay)
 
 
 # ---------------------------------------------------------------- 模板与工具

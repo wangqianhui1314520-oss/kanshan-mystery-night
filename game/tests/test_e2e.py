@@ -232,8 +232,18 @@ class TestSinglePlayerE2E:
                                           {"location": "../../etc", "keyword": "x"})
         assert err is None and any(
             e["payload"].get("event") == "bad_location" for e in events)
-        # 无效投票目标
+        # round_table 是对质幕：search 必须被引擎拒绝，且不消耗 AP/不写入搜证结果。
         driver.apply_action(session, "advance", "player:1", {})
+        assert session["stage"] == "round_table"
+        ap_before = session["actions_left"]
+        action_count_before = len(session["actions"])
+        events, err = driver.apply_action(session, "search", "player:1",
+                                          {"location": "监控室", "keyword": "监控"})
+        assert err and "不允许动作 search" in err
+        assert session["actions_left"] == ap_before
+        assert len(session["actions"]) == action_count_before
+        assert not any(e["type"] == "search_result" for e in events)
+        # 无效投票目标
         driver.apply_action(session, "advance", "player:1", {})
         events, err = driver.apply_action(session, "vote", "player:1",
                                           {"target": "char_99"})

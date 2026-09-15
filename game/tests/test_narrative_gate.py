@@ -182,6 +182,49 @@ def test_kanshan_narrative_gate_no_errors(tmp_path):
 
 # ------------------------------- mutation test -----------------------------
 
+def test_evidence_gate_rejects_missing_third_link(tmp_path):
+    from studio import generate, scenario_dir
+    job = generate("证据门禁 mutation：缺第三条 link", use_llm=False)
+    src = scenario_dir(job["id"])
+    dest = tmp_path / job["id"]
+    _copy_tree_safe(src, dest)
+    truth = json.loads((dest / "truth.json").read_text(encoding="utf-8"))
+    node = truth["truth_nodes"][0]
+    links = [
+        path for path in (dest / "clues").glob("clue_*.json")
+        if node["id"] in (json.loads(path.read_text(encoding="utf-8")).get("linked_truth_nodes") or [])
+    ]
+    assert len(links) >= 3
+    clue = json.loads(links[0].read_text(encoding="utf-8"))
+    clue["linked_truth_nodes"] = [tid for tid in clue["linked_truth_nodes"] if tid != node["id"]]
+    links[0].write_text(json.dumps(clue, ensure_ascii=False), encoding="utf-8")
+    gate = validate_dir(dest)
+    assert not gate["ok"]
+    assert any(e.startswith("NARR-EVIDENCE:") and node["id"] in e for e in gate["errors"])
+
+
+def test_evidence_gate_excludes_fake_and_dangling_links(tmp_path):
+    from studio import generate, scenario_dir
+    job = generate("证据门禁 mutation：fake 与悬空 link", use_llm=False)
+    src = scenario_dir(job["id"])
+    dest = tmp_path / job["id"]
+    _copy_tree_safe(src, dest)
+    fake_path = dest / "clues" / "clue_012.json"
+    fake = json.loads(fake_path.read_text(encoding="utf-8"))
+    fake["linked_truth_nodes"] = ["tn_01", "tn_99"]
+    fake_path.write_text(json.dumps(fake, ensure_ascii=False), encoding="utf-8")
+    real_path = dest / "clues" / "clue_001.json"
+    real = json.loads(real_path.read_text(encoding="utf-8"))
+    real["linked_truth_nodes"] = [tid for tid in real["linked_truth_nodes"] if tid != "tn_01"]
+    real_path.write_text(json.dumps(real, ensure_ascii=False), encoding="utf-8")
+    gate = validate_dir(dest)
+    assert not gate["ok"]
+    # The fake link does not make tn_01 composeable; the dangling id is also
+    # rejected by the ordinary reference gate.
+    assert any("clue_012 指向不存在节点 tn_99" in e for e in gate["errors"])
+    assert any(e.startswith("NARR-EVIDENCE:") and "tn_01" in e for e in gate["errors"])
+
+
 def test_mutation_gate_off_lets_bad_pack_through(tmp_path, monkeypatch):
     """QA 铁律：NARRATIVE_GATE=0 关闭闸门（等价于注释掉三检查器调用），
     V1 坏样本从「被拦」变「漏过」。报告留存两次运行输出：

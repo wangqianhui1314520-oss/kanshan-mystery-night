@@ -10,7 +10,8 @@
 
   /* ---------- Boss 全屏揭示演出 ---------- */
   const BossReveal = {
-    setup() {
+    emits: ['close'],
+    setup(props, { emit }) {
       const S = window.Store.state, M = window.Store.M;
       const phase = ref(0);
       const lineIdx = ref(-1);
@@ -53,7 +54,7 @@
         if (window.SFX && window.SFX.stopVo) window.SFX.stopVo();
         phase.value = 4;
       };
-      const finish = () => { S.bossSeen = true; S.view = 'review'; };
+      const finish = () => { S.bossSeen = true; S.view = 'review'; emit('close'); };
       return { S, M, phase, lineIdx, typed, skip, finish, allLines };
     },
     template: `
@@ -105,7 +106,8 @@
       <div class="ending-card">
         <span class="ending-tag">结局解锁</span>
         <h1>{{ ending.name }}</h1>
-        <p class="ending-desc">{{ ending.desc }}</p>
+        <p class="ending-desc">{{ (S.endingSummary && S.endingSummary.desc) || ending.desc }}</p>
+        <p v-if="S.endingSummary && S.endingSummary.title && S.endingSummary.title !== ending.name" class="dim ending-engine-summary">引擎结算：{{ S.endingSummary.title }}</p>
         <div v-if="profile" class="tp-card">
           <truth-radar :profile="profile"></truth-radar>
           <div>
@@ -124,7 +126,7 @@
           <button class="btn ghost" @click="Store.reset()">重开一局</button>
         </div>
       </div>
-      <boss-reveal v-if="isBoss" style="position:fixed; inset:0; z-index:80;"></boss-reveal>
+      <boss-reveal v-if="isBoss" @close="S.bossSeen = true" style="position:fixed; inset:0; z-index:80;"></boss-reveal>
     </section>`
   };
 
@@ -258,7 +260,7 @@
         </div>
       </div>
 
-      <boss-reveal v-if="boss" style="position:fixed; inset:0; z-index:80;"></boss-reveal>
+      <boss-reveal v-if="boss" @close="boss = false" style="position:fixed; inset:0; z-index:80;"></boss-reveal>
     </section>`
   };
 

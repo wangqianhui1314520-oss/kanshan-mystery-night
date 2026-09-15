@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from ..brief import TYPE_META, normalize_brief
+from ..evidence_contract import ensure_evidence_playability
 from ..tiers import KC_COPY
 from . import extract, narrative
 from .lexicon import PACK_DEFAULTS
@@ -148,4 +149,5 @@ def _assemble(hook: str, brief: dict, pack: str, mood: str, inner_boss: bool) ->
         "hotfeed": posts,
         "kc_plan": kc_plan,
     }
+    ensure_evidence_playability(detail)
     return {"world": world, "detail": detail, "acts": acts}

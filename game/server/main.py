@@ -28,20 +28,31 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-# 凭证注入：部署/本地启动时从 game/.env 读取（仅在环境变量未设时填充，不覆盖已有值）。
-# 缺失 python-dotenv 时静默跳过（进程环境变量方式仍可用），不影响启动。
+# 凭证注入：部署/本地启动时从 game/.env 读取（仅在环境变量未设时填充）。
+# dotenv 缺失不阻止服务启动，但保留可诊断状态，避免 AI 未配置原因被静默吞掉。
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+_DOTENV_STATUS = {"available": False, "loaded": False, "error": ""}
 try:
     from dotenv import load_dotenv
-    _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+    _DOTENV_STATUS["available"] = True
     if _ENV_FILE.exists():
         load_dotenv(_ENV_FILE, override=False)
-except Exception:
-    pass
+        _DOTENV_STATUS["loaded"] = True
+except Exception as exc:
+    _DOTENV_STATUS["error"] = type(exc).__name__
+    import logging
+    logging.getLogger(__name__).warning(
+        "python-dotenv unavailable; game/.env was not loaded (%s)", type(exc).__name__)
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+
+# Windows 本机系统代理可能把 localhost/回环与出网请求送进代理，造成 502/405。
+# 服务端所有 HTTP 出站统一直连；各 httpx 调用仍显式 trust_env=False。
+os.environ["NO_PROXY"] = "*"
+os.environ["no_proxy"] = "*"
 
 from .gateway.zhihu_gateway import ZhihuGateway
 from .mock_engine import CLIENT_ACTIONS, MockStateMachine, make_event, mock_enabled
@@ -122,6 +133,7 @@ class GameServer:
         # 阻塞所有其他房间；同时仍保证同一 session 的读改写原子性。
         self._action_locks: dict[str, asyncio.Lock] = {}
         self._ai_waving = False  # run_ai_wave 重入保护（allow_ai=True 路径不再 wave）
+        self._ws_action_tasks: set[asyncio.Task] = set()
 
     def _action_lock_for(self, session_id: str) -> asyncio.Lock:
         """返回指定对局的锁；锁只在进程内存在，不写入 session。"""
@@ -136,6 +148,23 @@ class GameServer:
         lock = self._action_locks.get(session_id)
         if lock is not None and not lock.locked():
             self._action_locks.pop(session_id, None)
+
+    async def _run_ws_action(self, ws, session_id: str, action_type: str,
+                             actor: str, payload: dict) -> None:
+        """后台完成 WS 动作；AI 回复不能占住该连接的收包循环。"""
+        try:
+            _, error = await self.run_action(session_id, action_type, actor, payload)
+            if error is not None:
+                await self._send_error(ws, session_id, error["notice"])
+        except Exception as exc:  # pragma: no cover - 连接断开时仅做兜底
+            await self._send_error(ws, session_id, f"动作处理异常：{type(exc).__name__}: {exc}")
+
+    def _spawn_ws_action(self, ws, session_id: str, action_type: str,
+                         actor: str, payload: dict) -> None:
+        task = asyncio.create_task(
+            self._run_ws_action(ws, session_id, action_type, actor, payload))
+        self._ws_action_tasks.add(task)
+        task.add_done_callback(self._ws_action_tasks.discard)
 
     # ------------------------------------------------------------- 房间管理
     async def on_connect(self, ws, room_id: str):
@@ -966,11 +995,18 @@ class GameServer:
             try:
                 preview, err = await self.run_ai_act(session_id, role, dry_run=True)
                 pre_decision = (preview or {}).get("decision") or {}
-                if err is not None or pre_decision.get("type") == "advance": continue
+                if err is not None:
+                    collected.append(await self._emit_ai_act_failed(session_id, role, err))
+                    continue
+                if pre_decision.get("type") == "advance":
+                    continue
                 body, err = await self.run_ai_act(
                     session_id, role, dry_run=False,
                     prefetched_decision=pre_decision)
-                if err is None and body.get("applied"):
+                if err is not None:
+                    collected.append(await self._emit_ai_act_failed(session_id, role, err))
+                    continue
+                if body.get("applied"):
                     seat_events = body.get("events") or []
                     collected.extend(seat_events)
                     # 广播契约（2026-09-14 双广播修复）：本批事件已由
@@ -979,14 +1015,37 @@ class GameServer:
                     # seat_events——曾因双广播 + 事件无 message_id 导致
                     # WS 前端每条 AI 台词相邻上屏两遍。非 WS 前端走
                     # HTTP /ai_wave 响应的 events，保持不变。
-            except Exception:
-                continue
+            except Exception as exc:
+                collected.append(await self._emit_ai_act_failed(
+                    session_id, role,
+                    {"status": 500, "notice": f"AI 行动异常：{type(exc).__name__}: {exc}"}))
         # AI 演出位：小游戏（心声窃听）+ 暗拍/头条，每幕各至多一次，零副作用兜底
         try:
             collected.extend(self._ai_showtime_spot(session_id, roles))
         except Exception:
             pass
         return collected
+
+    @staticmethod
+    def _ai_act_failed_event(session_id: str, role: str, error: dict) -> dict:
+        """Make AI-seat failures visible without faking a successful action."""
+        return make_event("system", session_id, 0, f"player:ai:{role}", {
+            "event": "ai_act_failed",
+            "role_id": role,
+            "status": int((error or {}).get("status") or 500),
+            "notice": str((error or {}).get("notice") or "AI 席行动失败"),
+            "source": "server",
+        })
+
+    async def _emit_ai_act_failed(self, session_id: str, role: str, error: dict) -> dict:
+        event = self._ai_act_failed_event(session_id, role, error)
+        if self.store is not None:
+            session = self.store.load_session(session_id)
+            if session is not None:
+                session.setdefault("events", []).append(event)
+                self.store.save_session(session_id, session)
+        await self.broadcast(session_id, [event])
+        return event
 
     def _ai_showtime_spot(self, session_id: str, roles: list[str]) -> list[dict]:
         """AI 坐席的"像真人一样玩"演出位：每幕每类至多一次，确定性作答/投标，
@@ -1266,8 +1325,20 @@ class GameServer:
                     ws, session_id,
                     f"内容安全过滤：检测到{reason}，消息已拦截（未消耗任何额度）")
                 return
-        events, error = await self.run_action(
-            session_id, action_type, str(msg.get("actor", "player:1")), payload)
+        actor = str(msg.get("actor", "player:1"))
+        # 真实玩家公开聊天的引擎动作已在 run_action 前段确定性落库，
+        # 后续 LLM 回复可能等待限流/重试；后台化避免同一 WS 的下一条
+        # advance/search 被聊天回复阻塞。定向私聊、AI 动作和 mock 保持原语义。
+        session = self.store.load_session(session_id)
+        use_mock = bool(session and session.get("engine", "mock") == "mock")
+        public_player_chat = (
+            action_type == "chat" and not use_mock
+            and not payload.get("whisper") and not payload.get("team")
+            and actor.startswith("player:") and not actor.startswith("player:ai:"))
+        if public_player_chat:
+            self._spawn_ws_action(ws, session_id, action_type, actor, payload)
+            return
+        events, error = await self.run_action(session_id, action_type, actor, payload)
         if error is not None:
             await self._send_error(ws, session_id, error["notice"])
 
@@ -1383,8 +1454,12 @@ def ingest_api_headers(req: Request, session_id: str | None = None) -> dict:
 
 
 def _slim_job_for_response(job: dict) -> dict:
-    """generate 响应：去掉 detail.memories 全文，保留 world/acts/gate/id/status/provider。"""
+    """生成轮询响应：统一任务/剧本编号并去掉 detail.memories 全文。"""
     out = dict(job)
+    scenario_id = str(out.get("scenario_id") or out.get("id") or "")
+    if scenario_id:
+        out["scenario_id"] = scenario_id
+        out.setdefault("job_id", scenario_id)
     detail = dict(out.get("detail") or {})
     detail.pop("memories", None)
     out["detail"] = detail
@@ -1518,6 +1593,8 @@ async def studio_generate(req: Request):
         job["job_id"] = job_id
         job["zhihu_refs"] = zhihu or {}
         rec.update(_slim_job_for_response(job))
+        # 任务受理时 scenario_id 尚未知；终态必须回填实际可玩的 gen_*。
+        rec["scenario_id"] = job.get("id")
 
     async def _runner() -> None:
         async with _STUDIO_GEN_LOCK:
@@ -1584,6 +1661,244 @@ async def studio_list():
     """已生成本列表 + 预置种子。"""
     _require_studio()
     return {"ok": True, "items": list_jobs(), "presets": list(PRESET_SEEDS)}
+
+
+@app.get("/api/studio/zhihu/hot")
+async def studio_zhihu_hot():
+    """知乎热榜选题（创作素材）。素材桥未配置/失败 → 空列表优雅降级，不阻塞创作。
+
+    注意：必须注册在 /api/studio/{scenario_id} 通配路由之前，否则被吞。"""
+    _require_studio()
+    items: list = []
+    notice = ""
+    try:
+        from server.zhihu_bridge import fetch_hot_async
+        data = await fetch_hot_async(limit=12)
+        if isinstance(data, list):
+            for x in data:
+                if isinstance(x, dict) and str(x.get("title") or "").strip():
+                    items.append({"title": str(x["title"]).strip()})
+                elif isinstance(x, str) and x.strip():
+                    items.append({"title": x.strip()})
+    except Exception as e:  # noqa: BLE001
+        notice = f"知乎热榜暂不可用（{type(e).__name__}），可手写钩子"
+    if not items:
+        notice = notice or "知乎热榜暂不可用（未配置 ZHIHU_ACCESS_SECRET 或接口异常），可手写钩子"
+    return {"ok": True, "items": items, "notice": notice}
+
+
+# ---------------- 分阶段制作流水线（行业流程：真相先行 → 角色 → 幕次 → 过闸） ----------------
+# 注意：以下路由必须注册在 /api/studio/{scenario_id} 通配之前。
+
+def _studio_llm(use_llm: bool):
+    if not use_llm:
+        return None
+    try:
+        from agents.llm_client import LLMClient
+        return LLMClient()
+    except Exception:
+        return None
+
+
+def _studio_draft_meta(draft: dict) -> dict:
+    """返回工作台编排元数据；阶段正文仍由作者视图单独返回。"""
+    return {
+        "generation": draft.get("generation") or {},
+        "agents": draft.get("agents") or {},
+        "locks": draft.get("locks") or {},
+        "provenance": draft.get("provenance") or {},
+        "validation": draft.get("validation") or {},
+    }
+
+
+def _studio_stage_name(stage: str) -> str:
+    stage = str(stage or "").strip().lower()
+    if stage not in ("truth", "cast", "acts", "assemble"):
+        raise ValueError(f"未知生产阶段：{stage}")
+    return stage
+
+
+@app.post("/api/studio/draft")
+async def studio_draft_create(req: Request):
+    """阶段 1 立项确认：创建制作草稿（行业铁律：真相未定不写角色）。"""
+    _require_studio()
+    body = await req.json()
+    seed = str((body or {}).get("seed") or "").strip()
+    from studio.staged import create_draft
+    try:
+        draft = create_draft(seed, (body or {}).get("brief"),
+                             inner_boss=bool((body or {}).get("inner_boss")))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "draft_id": draft["draft_id"], "brief": draft["brief"],
+            **_studio_draft_meta(draft)}
+
+
+@app.get("/api/studio/draft/{draft_id}")
+async def studio_draft_get(draft_id: str):
+    _require_studio()
+    from studio.staged import load_draft
+    try:
+        draft = load_draft(draft_id)
+    except (FileNotFoundError, ValueError) as e:
+        raise HTTPException(status_code=404, detail=f"草稿不存在：{e}")
+    return {"ok": True, "draft": draft, **_studio_draft_meta(draft)}
+
+
+@app.post("/api/studio/draft/{draft_id}/stage/truth")
+async def studio_stage_truth(draft_id: str, req: Request):
+    """阶段 2 真相设计：AI 生成设计总纲草案，返回可编辑 world。"""
+    _require_studio()
+    body = await req.json()
+    from studio.staged import load_draft, stage_truth
+    try:
+        draft = load_draft(draft_id)
+    except (FileNotFoundError, ValueError):
+        raise HTTPException(status_code=404, detail="草稿不存在")
+    try:
+        draft = stage_truth(draft, llm=_studio_llm(bool((body or {}).get("use_llm"))), use_zhihu=bool((body or {}).get("use_zhihu")),
+                            inner_boss=bool((draft["brief"].get("modules") or {}).get("inner_boss")))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"真相生成失败：{type(e).__name__}: {e}")
+    w = draft["world"]
+    return {"ok": True, "provider": draft["providers"].get("truth"),
+            "world": w,
+            **_studio_draft_meta(draft),
+            "truth_brief": {
+                "title": w.get("title"), "logline": w.get("logline"),
+                "surface_truth": w.get("surface_truth"), "inner_truth": w.get("inner_truth"),
+                "truth_summary": w.get("truth_summary") or w.get("inner_truth"),
+                "culprit": w.get("culprit"),
+                "truth_nodes": (w.get("truth_nodes") or [])[:8],
+                "locations": w.get("locations"),
+            }}
+
+
+@app.post("/api/studio/draft/{draft_id}/stage/cast")
+async def studio_stage_cast(draft_id: str, req: Request):
+    """阶段 3 角色设定：基于（用户编辑后的）真相生成 4 嫌疑人草案。"""
+    _require_studio()
+    body = await req.json()
+    from studio.staged import load_draft, stage_cast
+    try:
+        draft = load_draft(draft_id)
+    except (FileNotFoundError, ValueError):
+        raise HTTPException(status_code=404, detail="草稿不存在")
+    try:
+        draft = stage_cast(draft, world=(body or {}).get("world"),
+                           llm=_studio_llm(bool((body or {}).get("use_llm"))), use_zhihu=bool((body or {}).get("use_zhihu")))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"角色生成失败：{type(e).__name__}: {e}")
+    chars = [{
+        "id": c.get("id"), "name": c.get("name"), "archetype": c.get("archetype"),
+        "comedy_hook": c.get("comedy_hook"), "public_bio": c.get("public_bio"),
+        "faction": c.get("faction"),
+    } for c in (draft["detail"].get("characters") or [])]
+    return {"ok": True, "provider": draft["providers"].get("cast"),
+            "detail": draft["detail"], "characters": chars,
+            **_studio_draft_meta(draft)}
+
+
+@app.post("/api/studio/draft/{draft_id}/stage/acts")
+async def studio_stage_acts(draft_id: str, req: Request):
+    """阶段 4 线索与幕次：基于真相+角色生成三幕与线索分配草案。"""
+    _require_studio()
+    body = await req.json()
+    from studio.staged import load_draft, stage_acts
+    try:
+        draft = load_draft(draft_id)
+    except (FileNotFoundError, ValueError):
+        raise HTTPException(status_code=404, detail="草稿不存在")
+    try:
+        draft = stage_acts(draft, world=(body or {}).get("world"),
+                           detail=(body or {}).get("detail"),
+                           llm=_studio_llm(bool((body or {}).get("use_llm"))), use_zhihu=bool((body or {}).get("use_zhihu")))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"幕次生成失败：{type(e).__name__}: {e}")
+    acts_out = [{"id": a.get("id"), "name": a.get("name"), "stage": a.get("stage"),
+                 "brief": a.get("brief"), "actions_allocated": a.get("actions_allocated")}
+                for a in (draft["acts"].get("acts") or [])]
+    return {"ok": True, "provider": draft["providers"].get("acts"),
+            "acts": draft["acts"], "acts_brief": acts_out,
+            "clues": (draft["acts"].get("clues") or [])[:12],
+            **_studio_draft_meta(draft)}
+
+
+@app.post("/api/studio/draft/{draft_id}/stage/{stage}/lock")
+async def studio_stage_lock(draft_id: str, stage: str, req: Request):
+    """作者人工锁定阶段输出；锁定由服务端持久化并记录 hash。"""
+    _require_studio()
+    body = await req.json()
+    try:
+        stage = _studio_stage_name(stage)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if stage == "assemble":
+        raise HTTPException(status_code=400, detail="assemble 由编译闸门锁定")
+    from studio.staged import load_draft, lock_draft_stage
+    try:
+        draft = load_draft(draft_id)
+    except (FileNotFoundError, ValueError):
+        raise HTTPException(status_code=404, detail="草稿不存在")
+    output = body.get("output") if isinstance(body, dict) else None
+    try:
+        draft = lock_draft_stage(draft, stage, output=output)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except (RuntimeError, ValueError) as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {"ok": True, "draft": draft, **_studio_draft_meta(draft)}
+
+
+@app.post("/api/studio/draft/{draft_id}/stage/{stage}/unlock")
+async def studio_stage_unlock(draft_id: str, stage: str):
+    """作者解锁阶段以修改；所有下游产物标记失效。"""
+    _require_studio()
+    try:
+        stage = _studio_stage_name(stage)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if stage == "assemble":
+        raise HTTPException(status_code=400, detail="assemble 无独立草稿锁")
+    from studio.staged import load_draft, unlock_draft_stage
+    try:
+        draft = load_draft(draft_id)
+    except (FileNotFoundError, ValueError):
+        raise HTTPException(status_code=404, detail="草稿不存在")
+    try:
+        draft = unlock_draft_stage(draft, stage)
+    except (RuntimeError, ValueError) as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {"ok": True, "draft": draft, **_studio_draft_meta(draft)}
+
+
+@app.post("/api/studio/draft/{draft_id}/assemble")
+async def studio_draft_assemble(draft_id: str, req: Request):
+    """阶段 6 编译过闸：三段终稿 → apply_brief → compile → 双册 → 结构+叙事闸门。"""
+    _require_studio()
+    body = await req.json()
+    from studio.staged import assemble, load_draft
+    try:
+        draft = load_draft(draft_id)
+    except (FileNotFoundError, ValueError):
+        raise HTTPException(status_code=404, detail="草稿不存在")
+    try:
+        job = assemble(draft, (body or {}).get("world"), (body or {}).get("detail"),
+                       (body or {}).get("acts"))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        # 前置阶段未锁定、编排状态不可开始属于客户端流程错误。
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"编译失败：{type(e).__name__}: {e}")
+    return {"ok": True, "scenario_id": job["id"], "status": job["status"],
+            "gate": job["gate"], "provider": job["provider"], "job": job,
+            **_studio_draft_meta(draft)}
 
 
 @app.get("/api/studio/{scenario_id}")
@@ -1676,16 +1991,23 @@ async def create_session(req: Request):
     api_cfg = ingest_api_headers(req)
     mode_now = engine_mode()
     if mode_now == "mock":
-        mock_eng = game_server.get_mock_engine({"scenario_id": scenario_id})
-        session = mock_eng.create_session(mode, host)
+        # 建局也放线程，避免重载生成包时阻塞 HTTP/WS 心跳。
+        def _build_mock_session():
+            mock_eng = game_server.get_mock_engine({"scenario_id": scenario_id})
+            return mock_eng, mock_eng.create_session(mode, host)
+        _, session = await asyncio.to_thread(_build_mock_session)
     else:
         if EngineDriver is None or not getattr(app.state, "engine_available", False):
             raise HTTPException(status_code=503, detail=(
                 "真实引擎当前不可装载（多为其他窗口对 engine/ 的并发编辑中间态）——"
                 "可临时设 ZHIHU_GAME_USE_MOCK_ENGINE=1 启用 mock 通道；原因："
                 f"{getattr(app.state, 'engine_error', 'unknown')}"))
-        eng = EngineDriver(scenario_path)
-        session = eng.create_session(mode, host)
+        # EngineDriver 会同步读取整套场景/角色/记忆/知识卡文件；必须在线程池
+        # 中完成，避免 Windows 慢盘或大剧本初始化拖住整个事件循环。
+        def _build_engine_session():
+            eng = EngineDriver(scenario_path)
+            return eng, eng.create_session(mode, host)
+        eng, session = await asyncio.to_thread(_build_engine_session)
         game_server.engines[session["session_id"]] = eng
     session["scenario_id"] = scenario_id
     welcome = make_event("system", session["session_id"], 1, "kanshan", {
@@ -2533,6 +2855,9 @@ async def health(request: Request, session_id: str | None = None):
         "voice_peers": (getattr(app.state, "voice_hub", None) or voice_hub).peer_count(),
         "gateway": gw,
         "ai": ai_info,
+        "dotenv": {"available": bool(_DOTENV_STATUS["available"]),
+                    "loaded": bool(_DOTENV_STATUS["loaded"]),
+                    "error": _DOTENV_STATUS["error"] or None},
         "degraded": bool(gw.get("degraded")) or not gw.get(
             "credentials_configured", False),
         "uptime_s": round(time.time() - getattr(app.state, "started_at",
@@ -2682,6 +3007,7 @@ async def ws_endpoint(ws: WebSocket, session_id: str):
             "heat": session.get("heat"),
             "players": [p["player_id"] for p in session.get("players", [])],
             "spectators": session.get("spectators", []),
+            "seats": session.get("seats_public") or session.get("seats") or [],
             "clues_gained": session.get("clues_gained", []),
             "status": session.get("status"),
             "engine": session.get("engine", "mock"),

@@ -16,7 +16,7 @@
 
       const truthNodes = computed(() => M.truthNodes || []);
       const collected = computed(() =>
-        Object.keys(S.clues).map(id => M.clues.find(c => c.id === id) || {
+        Object.keys(S.clues).map(id => (Store.clueById && Store.clueById(id)) || M.clues.find(c => c.id === id) || {
           id, name: (window.Labels && window.Labels.clue(id)) || '线索', linked: [], fact: '引擎发放的线索'
         }));
       const coveredArr = computed(() => S.evidenceLinks.flatMap(l => l.nodes || []));

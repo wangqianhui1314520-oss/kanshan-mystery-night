@@ -19,9 +19,11 @@ def _slug(text: str) -> str:
     return f"pack_{digest[:8]}"
 
 
-def make_scenario_id(title: str, seed: str) -> str:
+def make_scenario_id(title: str, seed: str, *, variant: str = "") -> str:
+    """Return a stable id whose digest includes the complete generation input."""
     slug = _slug(title) or "pack"
-    hex6 = hashlib.sha256(f"{title}|{seed}".encode("utf-8")).hexdigest()[:6]
+    material = f"{title}|{seed}|{variant}"
+    hex6 = hashlib.sha256(material.encode("utf-8")).hexdigest()[:8]
     return f"gen_{slug}_{hex6}"
 
 

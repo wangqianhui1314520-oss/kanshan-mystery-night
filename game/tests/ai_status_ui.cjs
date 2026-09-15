@@ -15,7 +15,7 @@ async function health(data) {
 }
 (async () => {
   await health({engine: {mode: 'engine', available: true}, ai: {state: 'configured', npc_provider: '知乎直答'}});
-  assert.equal(ux.ai.label, 'AI 已配置 · 待验证');
+  assert.equal(ux.ai.label, 'AI 已配置 · 首次发言时验证');
   assert.equal(ux.engine.probe, 'ok');
   await health({engine: {mode: 'engine', available: false}, ai: {state: 'failed'}});
   assert.equal(ux.engine.probe, 'degraded');

@@ -22,7 +22,7 @@
       const nodeById = id => (window.Labels && window.Labels.node(id)) || '真相节点';
       const saltIds = computed(() => (M.salt7Ids && M.salt7Ids.length) ? M.salt7Ids : ['salt_f1', 'salt_f2', 'salt_f3', 'salt_f4', 'clue_022']);
       const saltN = computed(() => saltIds.value.filter(id => S.clues[id]).length);
-      const saltCard = id => M.clues.find(c => c.id === id) || { id, name: (window.Labels && window.Labels.clue(id)) || '盐言碎片', fact: '', unlock: '' };
+      const saltCard = id => resolve(id) || { id, name: (window.Labels && window.Labels.clue(id)) || '盐言碎片', fact: '', unlock: '' };
       const flippedOf = (c) => !!(c && ((S.flipped && S.flipped[c.id]) || c.back));
       const sideBack = (c) => {
         if (!c) return '';
@@ -46,7 +46,7 @@
       };
       window.Net.on('system', onFlip);
       const exposed = c => !!S.exposedFakes[c.id];
-      const realOf = c => c.fake_of ? M.clues.find(x => x.id === c.fake_of) : null;
+      const realOf = c => c.fake_of ? resolve(c.fake_of) : null;
       const realOwned = c => { const r = realOf(c); return r && !!S.clues[r.id]; };
 
       const counts = computed(() => ({
@@ -167,7 +167,7 @@
           <div class="synth-top"><span class="chip good">证据卡</span><b>{{ ev.name }}</b></div>
           <p>互证线索 {{ ev.clueIds.length }} 条 · 覆盖真相节点【{{ nodeById(ev.node) }}】</p>
           <div class="synth-refs">
-            <span v-for="cid in ev.clueIds" :key="cid" class="chip tiny">{{ (M.clues.find(x=>x.id===cid)||{}).name || L.clue(cid) }}</span>
+            <span v-for="cid in ev.clueIds" :key="cid" class="chip tiny">{{ ((Store.clueById && Store.clueById(cid)) || {}).name || L.clue(cid) }}</span>
           </div>
         </div>
         <ux-state v-if="!synth.length" dense glyph="◈" title="暂无合成证据卡"

@@ -1,0 +1,59 @@
+- generic [ref=e4]:
+  - heading "求真档案局 · 看山失踪夜" [level=1] [ref=e5]
+  - paragraph [ref=e6]: 知乎黑客松 2026 · AI 原生欢乐阵营机制推理本
+  - status [ref=e7]:
+    - strong [ref=e8]: AI 已配置 · 首次发言时验证
+    - text: 自定义模型
+    - paragraph [ref=e9]: 已发现模型配置；尚未验证当前接口能否成功响应。
+    - button "重新检测" [ref=e10] [cursor=pointer]
+    - button "AI 设置与席位" [ref=e11] [cursor=pointer]
+  - paragraph [ref=e12]: 周五盘点夜。21:00，首席荣誉侦探刘看山进档案室后失踪。大门横幅亮起——【不出真相，不出此门】。23:00，封控确认，调查开始。
+  - region "游戏核心循环" [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e15]: 一局怎么玩
+      - generic [ref=e16]: 每次行动都让真相更近一步
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]: "1"
+        - generic [ref=e20]: 搜证
+        - generic [ref=e21]: 去现场找线索，拼出时间线
+      - generic [aria-hidden] [ref=e22]: →
+      - generic [ref=e23]:
+        - generic [ref=e24]: "2"
+        - generic [ref=e25]: 对话
+        - generic [ref=e26]: 问角色、听心声，验证矛盾
+      - generic [aria-hidden] [ref=e27]: →
+      - generic [ref=e28]:
+        - generic [ref=e29]: "3"
+        - generic [ref=e30]: 指认
+        - generic [ref=e31]: 用证据投票，解锁不同结局
+  - region "灵魂匹配局" [ref=e32]:
+    - generic [ref=e33]:
+      - generic [ref=e34]: 灵魂匹配局
+      - generic [ref=e35]: 在满是 AI 的房间里，找到说真话的人
+    - paragraph [ref=e36]: 3 道题，测测你和今晚哪位在场者灵魂同频——你的公开人设 vs 你的真实心声，会被 AI 读懂，还是被你看穿？
+    - button "开始 3 题灵魂小测 ▸" [ref=e37] [cursor=pointer]
+  - generic [ref=e38]:
+    - generic [ref=e39]:
+      - generic [ref=e40]: 任务卡已更新
+      - generic [ref=e41]: 本幕任务 · 私密提醒 · 整活建议
+    - paragraph [ref=e42]: 领取角色后，在「目标卡」查看自己的本幕任务。房间创建者可打开「主持人」工具。
+  - button "开 始 调 查" [ref=e43] [cursor=pointer]
+  - button "创作一本新剧本 ▸" [ref=e44] [cursor=pointer]
+  - button "我的剧本架 ▾" [ref=e45] [cursor=pointer]
+  - generic [ref=e46]:
+    - button "每日挑战" [ref=e47] [cursor=pointer]
+    - button "快速局" [ref=e48] [cursor=pointer]
+  - paragraph [ref=e49]:
+    - text: 单人评委线约 20 分钟 ·
+    - link "直达对照→回声→法官→画像" [ref=e50] [cursor=pointer]:
+      - /url: "#"
+  - group [ref=e51]:
+    - generic "更多玩法" [ref=e52] [cursor=pointer]
+  - button "跳过登录 · 直接进入（实习侦探证）" [ref=e53] [cursor=pointer]
+  - generic [ref=e54]:
+    - button "⚙ 设置" [ref=e55] [cursor=pointer]
+    - button "🏆 成就" [ref=e56] [cursor=pointer]
+    - button "❓ 玩法说明" [ref=e57] [cursor=pointer]
+    - button "ℹ 关于" [ref=e58] [cursor=pointer]
+  - paragraph [ref=e59]: v4.0 · 求真档案局项目组 · 知乎登录后解锁：真名侦探证 / 知乎头像 / 个性化台词

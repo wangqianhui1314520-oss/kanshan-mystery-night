@@ -101,6 +101,7 @@ def test_pollution_ammo_boosts_refute(driver_and_session):
                       {"skill": "refute", "post": post["id"], "card": card_id})
     res = next(e["payload"] for e in evs if e["payload"].get("event") == "refute_result")
     assert res["ok"] is True
+    assert res["post"] == post["id"] and res["card"] == card_id
     assert res["ammo_spent"] == 1 and res["ammo"] == 0
     assert res["heat_delta"] == -int(post.get("heat_delta", 5)) - 2
     assert d.pc.ammo() == 0 and d.pc.ammo_earned() == 1

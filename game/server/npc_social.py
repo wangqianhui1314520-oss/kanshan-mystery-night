@@ -68,7 +68,12 @@ async def social_request(server, session_id, body, *, private=False,
     ok, reason = check_text(prompt)
     if not ok:
         raise HTTPException(422, f"内容安全过滤：{reason}")
-    async with server._action_lock_for(session_id):
+    # P0-3 party 取证（2026-09-15）：锁只保护准备段——此前整段社交波
+    # （全员逐席 LLM，数十秒）都持 action_lock，同房间搜证/投票/私聊全部
+    # 排队（实测 pA 搜证 30s 无响应）。LLM 串联移到锁外，落库改短锁 merge。
+    _lock = server._action_lock_for(session_id)
+    await _lock.acquire()
+    try:
         session = server.store.load_session(session_id)
         if not session:
             raise HTTPException(404, "对局不存在")
@@ -166,118 +171,134 @@ async def social_request(server, session_id, body, *, private=False,
         last_human_line = next(
             (ln for ln in reversed(public_lines)
              if ln.split("：", 1)[0].startswith("player:")), "")
-        for cid in roles:
-            if cid not in rt.npcs:
-                continue
-            # A private exchange never enters the shared NPC short-term memory.
-            npc = copy.copy(rt.npcs[cid])
-            npc.gateway = llm
-            memory_key = sender + ":" + cid
-            private_memory = session.setdefault("npc_private_memory", {}) if private else {}
-            npc.memory = copy.deepcopy(private_memory.get(memory_key) if private else rt.npcs[cid].memory)
-            npc.memory = npc.memory or {"short_term": [], "long_term": []}
-            blocks = eng.ms.visible_blocks(cid, include_heart=True)
-            unlocked = any(getattr(b, "layer", None) == "heart" for b in blocks)
-            npc.update_memory(blocks, version=eng.ms.current_version(cid), heart_unlocked=unlocked)
-            context = ("【最高优先级角色扮演协议】你正在参加一场中文欢乐阵营推理游戏。你必须始终扮演角色「" + str(npc.character.get("name", cid)) + "」，"
-                       "绝对不要介绍自己是知乎直答、AI、模型或产品；不要输出产品宣传语。"
-                       "用第一人称自然口语，结合你的角色经历、说话习惯和已解锁记忆回答。"
-                       "回复必须包含与本角色经历或当前现场相关的具体内容，不能使用通用客服话术。"
-                       "当前阶段：" + stage + "。只引用已知信息；公开讨论最近发言：\n" + "\n".join(public_lines)
-                       + ("\n（下面这句话是玩家私聊原话）" if private else "\n（下面这句话是主持人的邀请原文）"))
-            if not private and last_human_line:
-                context += ("\n（最近一条真人玩家发言：" + last_human_line
-                            + " ——请优先正面回应它：回答、反问、质疑，或结合你的经历补充；不要复读别人说过的话。）")
-            if not private:
-                context += ("\n（你可以选择是否发言：若有值得说的话请给出实质回复；"
-                            "若此刻你的角色确实无需表态、插话会显得刻意，就只回复【沉默】两个字，"
-                            "表示保持安静。除【沉默】外不要输出任何旁白或说明。）")
-            try:
-                reply = await asyncio.to_thread(npc.respond, prompt, trust=0, context=context)
+    finally:
+        _lock.release()
+    for cid in roles:
+        if cid not in rt.npcs:
+            continue
+        # A private exchange never enters the shared NPC short-term memory.
+        npc = copy.copy(rt.npcs[cid])
+        npc.gateway = llm
+        memory_key = sender + ":" + cid
+        private_memory = session.setdefault("npc_private_memory", {}) if private else {}
+        npc.memory = copy.deepcopy(private_memory.get(memory_key) if private else rt.npcs[cid].memory)
+        npc.memory = npc.memory or {"short_term": [], "long_term": []}
+        blocks = eng.ms.visible_blocks(cid, include_heart=True)
+        unlocked = any(getattr(b, "layer", None) == "heart" for b in blocks)
+        npc.update_memory(blocks, version=eng.ms.current_version(cid), heart_unlocked=unlocked)
+        context = ("【最高优先级角色扮演协议】你正在参加一场中文欢乐阵营推理游戏。你必须始终扮演角色「" + str(npc.character.get("name", cid)) + "」，"
+                   "绝对不要介绍自己是知乎直答、AI、模型或产品；不要输出产品宣传语。"
+                   "用第一人称自然口语，结合你的角色经历、说话习惯和已解锁记忆回答。"
+                   "回复必须包含与本角色经历或当前现场相关的具体内容，不能使用通用客服话术。"
+                   "当前阶段：" + stage + "。只引用已知信息；公开讨论最近发言：\n" + "\n".join(public_lines)
+                   + ("\n（下面这句话是玩家私聊原话）" if private else "\n（下面这句话是主持人的邀请原文）"))
+        if not private and last_human_line:
+            context += ("\n（最近一条真人玩家发言：" + last_human_line
+                        + " ——请优先正面回应它：回答、反问、质疑，或结合你的经历补充；不要复读别人说过的话。）")
+        if not private:
+            context += ("\n（你可以选择是否发言：若有值得说的话请给出实质回复；"
+                        "若此刻你的角色确实无需表态、插话会显得刻意，就只回复【沉默】两个字，"
+                        "表示保持安静。除【沉默】外不要输出任何旁白或说明。）")
+        try:
+            reply = await asyncio.to_thread(npc.respond, prompt, trust=0, context=context)
+            provider = getattr(llm, "last_provider", "")
+            if not reply or getattr(llm, "last_error", "") or provider in ("mock", "fallback"):
+                raise ValueError("provider unavailable")
+            from .booklet_svc import library_of
+            violations = rt.guard.check(npc.character, reply, {
+                "trust": 0, "stage": stage,
+                "memory_state": {"heart_unlocked": unlocked, "blocks": blocks},
+                "must_not_say": library_of(session).merged_hints(cid, chapter).get("must_not", []),
+            })
+            if has_product_identity(reply):
+                # 重新请求一次角色化回答，避免把产品介绍展示给玩家。
+                if npc.memory["short_term"]:
+                    npc.memory["short_term"].pop()  # 丢弃被作废的首版草稿，只留玩家原话
+                retry_context = context + "\n" + RETRY_HINT
+                reply = await asyncio.to_thread(npc.respond, prompt, trust=0, context=retry_context)
                 provider = getattr(llm, "last_provider", "")
-                if not reply or getattr(llm, "last_error", "") or provider in ("mock", "fallback"):
-                    raise ValueError("provider unavailable")
-                from .booklet_svc import library_of
-                violations = rt.guard.check(npc.character, reply, {
-                    "trust": 0, "stage": stage,
-                    "memory_state": {"heart_unlocked": unlocked, "blocks": blocks},
-                    "must_not_say": library_of(session).merged_hints(cid, chapter).get("must_not", []),
-                })
-                if has_product_identity(reply):
-                    # 重新请求一次角色化回答，避免把产品介绍展示给玩家。
-                    if npc.memory["short_term"]:
-                        npc.memory["short_term"].pop()  # 丢弃被作废的首版草稿，只留玩家原话
-                    retry_context = context + "\n" + RETRY_HINT
-                    reply = await asyncio.to_thread(npc.respond, prompt, trust=0, context=retry_context)
-                    provider = getattr(llm, "last_provider", "")
-                if violations:
-                    # P1-1（2026-09-14）：扩池+稳定轮换，按原 reply 长度取样——
-                    # 多席同时触发也各不相同，不再单句复读。
-                    npc.last_reply_kind = "violations"
-                    reply = _VIOLATION_SAFE_LINES[
-                        len(str(reply)) % len(_VIOLATION_SAFE_LINES)]
-                if not check_text(reply)[0]:
-                    raise ValueError("unsafe reply")
-            except Exception as exc:
-                last_error = str(exc)[:180]
-                failures.append(cid)
-                continue
-            # 选择性回复：AI 声明保持沉默（只回【沉默】标记）时，本席不产出
-            # 任何消息（不出现在聊天流），短期记忆保留「（沉默）」——它记得
-            # 自己这轮没说话；随后轮到下一席继续。
-            if not private and re.fullmatch(r"[（(【\s]*沉默[）)】\s]*", reply.strip()):
-                npc.memory["short_term"][-1]["npc"] = "（沉默）"
-                rt.npcs[cid].memory = npc.memory
-                continue
-            npc.memory["short_term"][-1]["npc"] = reply
-            if private:
-                private_memory[memory_key] = npc.memory
-            else:
-                rt.npcs[cid].memory = npc.memory
-            def event(actor, payload):
-                payload["message_id"] = uuid4().hex
-                return make_event("chat", session_id, session.get("round", 1), actor, payload)
-            if private:
-                events.append(event(sender, {"actor_kind": "player", "player_id": sender,
-                    "char_id": cid, "text": prompt, "whisper": True, "to": "npc:" + cid}))
-            payload = {"actor_kind": "npc", "char_id": cid, "text": reply,
-                       "source": "agent", "provider": provider,
-                       "ai_provider": str(provider or ""), "wave": not private}
-            # P1-2 诚实化：守卫层替换（identity_guarded/violations）标 fallback:*
-            kind = getattr(npc, "last_reply_kind", "llm")
-            if kind != "llm":
-                payload["provider"] = payload["ai_provider"] = f"fallback:{kind}"
-                payload["degraded"] = True
-            if private:
-                payload.update(whisper=True, to=sender, reply_to=sender)
-            events.append(event("npc:" + cid, payload))
-            if not private:
-                public_lines = (public_lines + [reply])[-8:]
-                # 上下文串联：本席回复立即进入公开最近发言，下一席 AI 的
-                # prompt 会带上它（逐席衔接、连贯自然）；节流已按比赛模式
-                # 取消，连续调用由 llm_client/gateway 的等待型限流兜底。
-                # 逐席实时广播：玩家即时看到「AI 一句接一句」的串联节奏，
-                # 无需等全员生成完毕才齐刷上屏（HTTP 响应仍带全量 events，
-                # 前端按 message_id 去重，不会重复上屏）。
-                await server.broadcast(session_id, [events[-1]])
-        if not events and failures:
-            detail = "AI 接口未能返回回复，请检查 API 配置与额度后重试"
-            if last_error:
-                detail += "；诊断：" + last_error
-            raise HTTPException(503, detail)
-        # 按实际发言数回写该用途的已服务席位（respond 失败不计），并据此前推
-        # 引导轮是否覆盖满一轮空席（covered → social_phases_done）。
-        if not private and events:
-            spoke = sum(1 for e in events
-                        if e.get("type") == "chat" and str(e.get("actor") or "").startswith("npc:"))
-            served_map[track_key] = int(served_map.get(track_key) or 0) + spoke
-            if auto_respond and phase in ("intro", "testimony") \
-                    and served_map.get(track_key, 0) >= vacant_at_start:
-                done = set(session.get("social_phases_done") or [])
-                done.add(phase)
-                session["social_phases_done"] = sorted(done)
-        session.setdefault("events", []).extend(events)
-        server.store.save_session(session_id, session)
+            if violations:
+                # P1-1（2026-09-14）：扩池+稳定轮换，按原 reply 长度取样——
+                # 多席同时触发也各不相同，不再单句复读。
+                npc.last_reply_kind = "violations"
+                reply = _VIOLATION_SAFE_LINES[
+                    len(str(reply)) % len(_VIOLATION_SAFE_LINES)]
+            if not check_text(reply)[0]:
+                raise ValueError("unsafe reply")
+        except Exception as exc:
+            last_error = str(exc)[:180]
+            failures.append(cid)
+            continue
+        # 选择性回复：AI 声明保持沉默（只回【沉默】标记）时，本席不产出
+        # 任何消息（不出现在聊天流），短期记忆保留「（沉默）」——它记得
+        # 自己这轮没说话；随后轮到下一席继续。
+        if not private and re.fullmatch(r"[（(【\s]*沉默[）)】\s]*", reply.strip()):
+            npc.memory["short_term"][-1]["npc"] = "（沉默）"
+            rt.npcs[cid].memory = npc.memory
+            continue
+        npc.memory["short_term"][-1]["npc"] = reply
+        if private:
+            private_memory[memory_key] = npc.memory
+        else:
+            rt.npcs[cid].memory = npc.memory
+        def event(actor, payload):
+            payload["message_id"] = uuid4().hex
+            return make_event("chat", session_id, session.get("round", 1), actor, payload)
+        if private:
+            events.append(event(sender, {"actor_kind": "player", "player_id": sender,
+                "char_id": cid, "text": prompt, "whisper": True, "to": "npc:" + cid}))
+        payload = {"actor_kind": "npc", "char_id": cid, "text": reply,
+                   "source": "agent", "provider": provider,
+                   "ai_provider": str(provider or ""), "wave": not private}
+        # P1-2 诚实化：守卫层替换（identity_guarded/violations）标 fallback:*
+        kind = getattr(npc, "last_reply_kind", "llm")
+        if kind != "llm":
+            payload["provider"] = payload["ai_provider"] = f"fallback:{kind}"
+            payload["degraded"] = True
+        if private:
+            payload.update(whisper=True, to=sender, reply_to=sender)
+        events.append(event("npc:" + cid, payload))
+        if not private:
+            public_lines = (public_lines + [reply])[-8:]
+            # 上下文串联：本席回复立即进入公开最近发言，下一席 AI 的
+            # prompt 会带上它（逐席衔接、连贯自然）；节流已按比赛模式
+            # 取消，连续调用由 llm_client/gateway 的等待型限流兜底。
+            # 逐席实时广播：玩家即时看到「AI 一句接一句」的串联节奏，
+            # 无需等全员生成完毕才齐刷上屏（HTTP 响应仍带全量 events，
+            # 前端按 message_id 去重，不会重复上屏）。
+            await server.broadcast(session_id, [events[-1]])
+    if not events and failures:
+        detail = "AI 接口未能返回回复，请检查 API 配置与额度后重试"
+        if last_error:
+            detail += "；诊断：" + last_error
+        raise HTTPException(503, detail)
+    # 按实际发言数回写该用途的已服务席位（respond 失败不计），并据此前推
+    # 引导轮是否覆盖满一轮空席（covered → social_phases_done）。
+    if not private and events:
+        spoke = sum(1 for e in events
+                    if e.get("type") == "chat" and str(e.get("actor") or "").startswith("npc:"))
+        served_map[track_key] = int(served_map.get(track_key) or 0) + spoke
+        if auto_respond and phase in ("intro", "testimony") \
+                and served_map.get(track_key, 0) >= vacant_at_start:
+            done = set(session.get("social_phases_done") or [])
+            done.add(phase)
+            session["social_phases_done"] = sorted(done)
+    # 落库改短锁 merge：重新 load 防覆盖并发玩家动作写入的事件；
+    # social_served / social_phases_done / npc_private_memory 为社交波
+    # 独占键，整表并入 fresh 安全。
+    _mlock = server._action_lock_for(session_id)
+    async with _mlock:
+        fresh = server.store.load_session(session_id) or session
+        fresh.setdefault("events", []).extend(events)
+        for _k in ("social_served", "social_phases_done", "npc_private_memory"):
+            if session.get(_k):
+                _cur = session[_k]
+                _old = fresh.get(_k)
+                if isinstance(_cur, dict) and isinstance(_old, dict):
+                    fresh[_k] = {**_old, **_cur}          # 键值表：合并
+                else:
+                    fresh[_k] = _cur                       # list（如 phases_done）：整值覆盖
+        server.store.save_session(session_id, fresh)
     if private:
         await server.broadcast_to(session_id, [sender], events)
     # 公开路径已逐席实时广播，无需整批重发（前端按 message_id 去重双保险）。

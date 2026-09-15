@@ -20,6 +20,8 @@ from .pipeline import generate, list_book_covers, list_jobs, load_job, load_play
 from .pipeline import public_of as public_snapshot
 from .tiers import PRESET_SEEDS, TIERS
 from .validate import validate_dir
+from .ir import IR_VERSION, ScriptPackage, stable_hash
+from .orchestrator import DEPENDENCIES, GenerationOrchestrator
 
 __all__ = [
     "TIERS",

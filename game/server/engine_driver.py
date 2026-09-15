@@ -87,7 +87,8 @@ JUDGE_LINE_CLUES = ("clue_001", "clue_002", "clue_005")
 # 真引擎 clue_021 是天台彩蛋、clue_032 是终局复盘破绽，不能当出门钥匙。
 # 用第一章就能搜到的公开线索（工位/档案室/前台/茶水间）对齐「先搜再进下一幕」。
 PARTY_CH1_KEYS = frozenset({
-    "clue_021", "clue_001", "clue_002", "clue_004", "clue_006", "clue_007",
+    # canonical clue_028 is the first-act boss flaw found at 看山工位/鱼干.
+    "clue_021", "clue_028", "clue_001", "clue_002", "clue_004", "clue_006", "clue_007",
 })
 DEFECT_CHARS = ("char_03", "char_04")
 ICEBREAKER_SKILLS = frozenset({
@@ -420,6 +421,19 @@ class EngineDriver:
         self.sm.session_id = session_id or ""
         self.ks.set_round(1)  # 急诊红灯轮次注入（V31：set_round 由 F 每轮调用）
         now = time.time()
+        # Count only roles with runtime-readable booklets. Generated packs are
+        # audited before HTTP creation; the same calculation keeps direct driver
+        # callers and restored sessions consistent.
+        ai_seat_count = 0
+        if mode != "party" and self.scenario_dir.name.startswith("gen_"):
+            try:
+                from engine.booklet import load_library
+                ai_seat_count = len([
+                    rid for rid in load_library(self.scenario_dir).role_ids()
+                    if rid != "investigator"
+                ])
+            except Exception:
+                ai_seat_count = 0
         session = {
             "session_id": session_id or f"s_{time.strftime('%Y%m%d')}_{int(now * 1000) % 100000000:08d}",
             "mode": mode,
@@ -451,10 +465,13 @@ class EngineDriver:
             "debate": self.jd.summary(),
             "profile": None,
             "boss_ready": self.ec.boss_ready(),
+            # Only an explicit judge-line handshake can enable the demo gate.
+            "demo_bypass": False,
             "status": "playing",
             "actions": [],
             "events": [],
             "booklet_roles": {host_player: "investigator"},
+            "ai_seat_count": ai_seat_count,
         }
         # V4 综艺：建局即产出案件介绍（案件卷宗页数据源，REST/WS 回放均可见）
         session["events"].append(self._case_intro_event(session["session_id"]))
@@ -938,6 +955,7 @@ class EngineDriver:
                          f"弹幕群嘲{'：' + '；'.join(res.get('crowd_mocks', [])[:2]) if res.get('crowd_mocks') else ''}")
             events = [make_event("system", sid, rnd, "dm", {
                 "event": "refute_result", "ok": res["ok"],
+                "post": post_id, "card": card_id,
                 "heat_delta": res["heat_delta"], "heat": self.of.heat,
                 "unlocked_clue": res.get("unlocked_clue"),
                 "crowd_mocks": res.get("crowd_mocks", []),
@@ -1145,6 +1163,9 @@ class EngineDriver:
                                                    trigger="debate:convinced"))
             return events
         if skill == "judge_line":
+            # Persist the handshake so a later bypass cannot be forged on a normal room.
+            if payload.get("demo_bypass") is True:
+                session["demo_bypass"] = True
             events: list[dict] = []
             if self.sm.stage == stage_machine.Stage.BREAK_ICE:
                 self.sm.advance()
@@ -1716,13 +1737,20 @@ class EngineDriver:
     # ---------------------------------------------------------------- advance
     def _do_advance(self, session: dict, actor: str, payload: dict) -> list[dict]:
         sid = session["session_id"]
-        if session.get("mode") == "party" and self.sm.stage.value == "investigate":
+        demo_bypass = (payload.get("demo_bypass") is True
+                       and session.get("demo_bypass") is True)
+        if (session.get("mode") == "party"
+                and self.sm.stage.value == "investigate"
+                and not demo_bypass):
             gained = set(session.get("clues_gained") or [])
             if not (gained & PARTY_CH1_KEYS):
                 return [make_event("system", sid, session.get("round", 1), "dm", {
                     "event": "advance_blocked",
-                    "toast": "还差关键证物「记忆芯片空盒」",
-                    "notice": "还差关键证物「记忆芯片空盒」（提示：去档案室搜「芯片」）"})]
+                    "toast": "还差关键证物（例如「茶水间的两包泡面」）",
+                    "notice": "还差关键证物才能推进指认——提示：去茶水间搜「泡面」、"
+                              "前台搜「横幅」、看山工位搜「鱼干」或「请假条」均可"
+                              "（2026-09-15 修正：原提示「档案室搜芯片」与实际线索不符，"
+                              "曾致 party 对局卡死在搜证幕）"})]
         before = self.sm.stage
         before_act = self.sm.current_act_no()  # V4 综艺：幕切换检测（act_transition）
         events = self._maybe_settle_headline(session)  # 竞价窗口懒结算（截止即拍）

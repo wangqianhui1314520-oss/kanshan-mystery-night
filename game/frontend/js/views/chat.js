@@ -193,7 +193,10 @@
       const showSearch = computed(() => (S.act === 1 || !!S.demo) && !iceLocked.value);
       const showHot = computed(() => !studioPack.value || S.studioModules.hotfeed !== false);
 
-      const startInvestigate = () => window.Store.finishStudioBreakIce();
+      const startInvestigate = () => {
+        if (window.Store.finishStudioBreakIce) return window.Store.finishStudioBreakIce();
+        return false;
+      };
       const askNpcWave = () => window.Store.requestNpcWave && window.Store.requestNpcWave();
 
       /* AI 来源徽章（契约：chat payload.ai_provider）：
@@ -234,6 +237,8 @@
             <span class="cs-dm-sub">系统播报</span>
             <p>{{ lastDm ? lastDm.text : '全员已在圆桌就座。点座位选人，底栏提问或搜证。' }}</p>
           </div>
+          <button v-if="S.stage === 'break_ice' && !iceLocked && S.dmBookRead && (S.chat || []).some(m => m.actor === 'npc')" type="button" class="btn primary sm cs-start-search" @click="startInvestigate">开始搜证 ▸</button>
+          <button v-else-if="S.stage === 'investigate' && S.act === 1" type="button" class="btn primary sm cs-start-search" @click="S.view = 'map'">进入现场搜证 ▸</button>
           <details v-if="S.actBrief"><summary>本幕目标</summary><p>{{ S.actBrief.title }}</p><p>{{ S.actBrief.text }}</p></details>
           <details v-if="S.caseIntro"><summary>案件卷宗</summary><p>{{ S.caseIntro.title }}</p><p>{{ S.caseIntro.summary }}</p><small>{{ S.caseIntro.attribution }}</small></details>
           <button v-if="canExposeV587" type="button" class="btn ghost sm" @click="exposeV587">观察笔记</button>

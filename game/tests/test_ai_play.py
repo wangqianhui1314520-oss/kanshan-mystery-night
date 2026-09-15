@@ -114,6 +114,42 @@ def _client(tmp_path, monkeypatch):
     return TestClient(main_mod.app)
 
 
+def test_generated_pack_solo_ai_votes_settle(tmp_path, monkeypatch):
+    from studio import generate, scenario_dir
+    from server.main import GameServer
+    from tests.test_chat_dup_guard import MemoryStore
+    from engine.stage_machine import Stage
+
+    job = generate("AI 闭卷投票回归：生成包终局", use_llm=False)
+    root = scenario_dir(job["id"])
+    driver = EngineDriver(root)
+    session = driver.create_session("quick", "player:1", "generated_solo_vote")
+    session["scenario_id"] = job["id"]
+    session["stage"] = "accuse"
+    driver.sm.stage = Stage.ACCUSE
+    driver.sm._index = len(driver.scenario.get("acts", [])) - 1
+    server = GameServer(root)
+    server.store = MemoryStore()
+    server.engines[session["session_id"]] = driver
+    server.store.save_session(session["session_id"], session)
+
+    async def run():
+        events, err = await server.run_action(
+            session["session_id"], "vote", "player:1", {"target": "char_01"})
+        assert err is None
+        await server.run_ai_wave(session["session_id"])
+        final = server.store.load_session(session["session_id"])
+        assert final["ai_seat_count"] == 4
+        assert len(final["votes"]) == 5
+        assert final["status"] == "ended"
+        assert sum(e.get("type") == "ending" for e in final["events"]) == 1
+        assert not any((e.get("payload") or {}).get("event") == "ai_act_failed"
+                       for e in final["events"])
+
+    import asyncio
+    asyncio.run(run())
+
+
 def test_ai_act_route_dry_run_and_apply(tmp_path, monkeypatch):
     with _client(tmp_path, monkeypatch) as client:
         sid = client.post("/api/session",

@@ -8,14 +8,14 @@
   <meta name="description" content="求真档案局 · 看山失踪夜 —— 知乎黑客松 2026 AI 原生欢乐阵营机制推理本：AI 剧本杀 + 知乎求真知识卡 + 反信息操纵。">
   <title>求真档案局 · 看山失踪夜</title>
   <link rel="icon" href="/assets/images/logo_badge.png">
-  <link rel="stylesheet" href="css/style.css?v=5d05a9a406a2">
-  <link rel="stylesheet" href="css/v31.css?v=bda08d158b60">
-  <link rel="stylesheet" href="css/chat_ref.css?v=4bed9a6b436d">
+  <link rel="stylesheet" href="css/style.css?v=menuui20260915">
+  <link rel="stylesheet" href="css/v31.css?v=menuui20260915">
+  <link rel="stylesheet" href="css/chat_ref.css?v=menuui20260915">
   <link rel="stylesheet" href="css/hotfeed_ref.css?v=c10f656de9ae">
   <link rel="stylesheet" href="css/memory_ref.css?v=ab2f2ce456d1">
   <link rel="stylesheet" href="css/minis.css?v=69ba1718c9d0">
-  <link rel="stylesheet" href="css/ux.css?v=20cbebdb0ffb">
-  <link rel="stylesheet" href="css/studio.css?v=f8320aa97050">
+  <link rel="stylesheet" href="css/ux.css?v=menuui20260915">
+  <link rel="stylesheet" href="css/studio.css?v=partyfix20260915">
   <link rel="stylesheet" href="css/innovate.css?v=3c0f20333b06">
   <link rel="stylesheet" href="css/playplus.css?v=a6cab2b5d961">
   <link rel="stylesheet" href="css/polish.css?v=d57665c0cc3e">
@@ -30,7 +30,9 @@
   </noscript>
 
   <!-- 知乎 OAuth 回调接收器（最先执行：捕获 code 并清理 URL） -->
-  <script src="js/oauth.js?v=20260914"></script>
+  <script src="js/oauth.js?v=b140dfc6e40e"></script>
+  <!-- API 地址层：localhost 页面在 Windows 上改走同端口 127.0.0.1，远程 origin 不变 -->
+  <script src="js/api.js?v=20260915"></script>
 
   <!-- Vue3 本地运行时（vendor 内置，断网可跑）；CDN 兜底仅框架脚本，非美术外链 -->
   <script src="js/vendor/vue.global.prod.js?v=b50eeefe35d4"></script>
@@ -47,32 +49,32 @@
   <script src="js/sfx.js?v=63874599dec9"></script>
   <script src="js/voice.js?v=cabfb86ef099"></script>
   <script src="js/voice_rtc.js?v=b04c7bdc0eed"></script>
-  <script src="js/store.js?v=ba985360aa6d"></script>
-  <script src="js/net.js?v=e8a58e9365de"></script>
+  <script src="js/store.js?v=partyfix20260915"></script>
+  <script src="js/net.js?v=partyfix20260915"></script>
 
   <!-- 美术注册表 + 共享 UI -->
   <script src="js/assets.js?v=7c8083f66be5"></script>
   <script src="js/ui.js?v=33b22de12609"></script>
   <!-- 体验层（引擎状态探针 / 三态占位 / 首屏引导） -->
-  <script src="js/ux.js?v=3f8eb2d3a420"></script>
+  <script src="js/ux.js?v=d07205ac0d37"></script>
 
   <!-- 视图组件 -->
   <script src="js/views/map.js?v=eb2b3548339f"></script>
-  <script src="js/views/chat.js?v=f70187b2b427"></script>
-  <script src="js/views/bag.js?v=9468b4f0f440"></script>
-  <script src="js/views/kcards.js?v=2e4e05a6fbf0"></script>
+  <script src="js/views/chat.js?v=b3b22c6d174d"></script>
+  <script src="js/views/bag.js?v=8622cea2be74"></script>
+  <script src="js/views/kcards.js?v=68b6936aa8a0"></script>
   <script src="js/views/memory.js?v=9cff013bca84"></script>
-  <script src="js/views/hotfeed.js?v=aa1ed36579a8"></script>
+  <script src="js/views/hotfeed.js?v=2b530575ee21"></script>
   <script src="js/views/vote.js?v=722705ebf8b1"></script>
   <script src="js/views/clinic.js?v=0fe2db788ca7"></script>
   <script src="js/views/pollution.js?v=8ba7fbc54a19"></script>
-  <script src="js/views/review.js?v=96eafd7fa76a"></script>
+  <script src="js/views/review.js?v=80a0b9807ff6"></script>
   <script src="js/views/evidence.js?v=b10946e4163c"></script>
   <script src="js/views/report.js?v=11ffb103f403"></script>
   <script src="js/views/antifraud.js?v=152e0a974255"></script>
-  <script src="js/studio/catalog.js?v=97d492fd01a0"></script>
+  <script src="js/studio/catalog.js?v=24237ea11929"></script>
   <script src="js/studio/brief.js?v=0059fa0ad175"></script>
-  <script src="js/views/studio.js?v=00185e53b1e4"></script>
+  <script src="js/views/studio.js?v=1b4779129051"></script>
   <script src="js/views/quiz.js?v=c00985da33a2"></script>
   <script src="js/views/radio.js?v=b096d0eb5826"></script>
 
@@ -81,13 +83,12 @@
   <script src="minis/runner.js?v=737071f9c58f"></script>
   <script src="minis/heart.js?v=043be12d3031"></script>
   <script src="minis/refute3.js?v=defa62d50ab3"></script>
-  <script src="minis/badge.js?v=fa14ebacba10"></script>
+  <script src="minis/badge.js?v=947428ea8a78"></script>
   <script src="minis/main-minis.js?v=7cef0f6d14b8"></script>
 
   <!-- 入口 -->
   <script src="js/goals.js?v=53510218405f"></script>
-  <script src="js/select.js?v=20260915"></script>
-  <script src="js/main.js?v=open-script-fix-20260914"></script>
+  <script src="js/main.js?v=menuui20260915"></script>
 </body>
 </html>
 

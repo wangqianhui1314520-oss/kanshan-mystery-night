@@ -7,6 +7,9 @@
   const { reactive, watch } = Vue;
   const M = window.MOCK;
   const SAVE_KEY = 'kanshan_save_v1';
+  const SAVE_SCHEMA_VERSION = 2;
+  let saveCreatedAt = 0;
+  let saveFailureNotified = false;
 
   const state = reactive({
     phase: 'menu', prologueStep: 0, playerHeadline: '',
@@ -40,7 +43,7 @@
     chat: [],
     aiLastDecision: null, // 最近一次 AI 行动诊断（来源/耗时/原因）
     currentNpc: 'dm',
-    ended: false, ending: null, voteResult: null,
+    ended: false, ending: null, endingSummary: null, voteResult: null,
     dmaku: [], banners: [], toasts: [],
     /* 本地行为指标：只记录动作类型/结果/耗时，不采集文本或身份信息。 */
     telemetry: { actions: {}, events: {}, startedAt: Date.now() },
@@ -99,6 +102,8 @@
     studioType: '',
     studioCamp: null,
     studioBooks: [],         // /public 封面；旧本 / 看山本为 []
+    studioBookLoading: '',   // 当前正在领取的角色故事本 char_id；空串表示无请求
+    studioBookError: '',     // 最近一次故事本领取失败提示
     stage: 'break_ice',        // break_ice | investigate | round_table | accuse（引擎 snapshot 覆盖）
     /* ---- 可玩补全：综艺/模式/隐藏层（不入瓜田废案） ---- */
     playMode: 'main',          // main | daily | quick
@@ -439,6 +444,38 @@
       const cur = JSON.parse(sessionStorage.getItem('party_ticket') || '{}');
       sessionStorage.setItem('party_ticket', JSON.stringify(Object.assign(cur, extra || {})));
     } catch (e) { /* 隐私模式忽略 */ }
+  }
+  let partySeatRecoveryPromise = null;
+  /* WS 自动重连只恢复事件流；party 还必须经幂等 /join 解除服务端 AI 接管。
+     单飞保护避免重连回调与手动重试同时改写同一席位。 */
+  async function restorePartySeat() {
+    if (state.mode !== 'party' || state.isSpectator || !state.sessionId || state.sessionId === '-') return false;
+    if (partySeatRecoveryPromise) return partySeatRecoveryPromise;
+    partySeatRecoveryPromise = (async () => {
+      let code = state.roomCode;
+      if (!code) {
+        try { code = JSON.parse(sessionStorage.getItem('party_ticket') || '{}').code || ''; } catch (e) { }
+      }
+      const pid = state.playerId || (window.myPlayerId ? window.myPlayerId() : '');
+      if (!code || !pid) return false;
+      try {
+        const body = { room_code: code, player_id: pid, role: 'player' };
+        if (state.partyChar) body.char_id = state.partyChar;
+        const r = await fetch('/api/session/' + encodeURIComponent(state.sessionId) + '/join', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        });
+        if (!r.ok) return false;
+        const j = await r.json().catch(() => ({}));
+        if (Array.isArray(j.seats)) state.partySeats = j.seats;
+        const mine = (j.seats || []).find(s => s && s.player_id === pid);
+        if (!mine || mine.connected === false || mine.is_ai || mine.ai_takeover) return false;
+        if (mine.char_id && Store.applyLocalSeat) Store.applyLocalSeat(mine.char_id);
+        savePartyTicket({ code: code, sid: state.sessionId, phase: state.phase === 'play' ? 'play' : 'seat', host: !!state.isHost });
+        return true;
+      } catch (e) { return false; }
+    })();
+    try { return await partySeatRecoveryPromise; }
+    finally { partySeatRecoveryPromise = null; }
   }
   const now = () => `R${state.round}`;
 
@@ -1552,7 +1589,11 @@
         if (p.text) chat('dm', p.text);
         break;
       case 'stage_changed':
-        if (p.stage) state.stage = p.stage;
+        if (p.stage) {
+          syncLiveStage({ stage: p.stage, actions_left: p.actions_left });
+          if (p.stage !== 'break_ice') state.studioNeedAdvance = false;
+        }
+        if (Array.isArray(p.seats)) state.partySeats = p.seats;
         if (p.actions_left !== undefined && state.mode !== 'party') state.ap = p.actions_left;
         break;
       case 'act_transition':
@@ -1563,15 +1604,19 @@
       case 'memory_no_op':
         if (p.text) chat('sys', p.text);
         break;
-      case 'ai_takeover':
-        state.partySeats = (state.partySeats || []).map(s => s.char_id === p.char_id ? { ...s, is_ai: true, ai_takeover: true, connected: false } : s);
+      case 'ai_takeover': {
+        const seatMatch = s => (p.char_id && s.char_id === p.char_id) || (p.player_id && s.player_id === p.player_id);
+        state.partySeats = (state.partySeats || []).map(s => seatMatch(s)
+          ? { ...s, is_ai: true, ai_takeover: true, connected: false } : s);
         chat('sys', p.notice || '该角色已由 AI 接管');
         break;
+      }
       case 'heat_report':
         state.heatReport = { heat: p.heat, blocked: (p.blocked_clues || []).length, text: p.text };
         if (p.heat !== undefined) state.heat = p.heat;
         break;
       case 'snapshot':
+        if (Array.isArray(p.seats)) state.partySeats = p.seats;
         (p.clues_gained || []).forEach(id => {
           const uid = uiClueId(id);
           if (!id) return;
@@ -1586,9 +1631,11 @@
         if (p.round != null) state.round = p.round;
         /* 与引擎 actSet 对齐：破冰+搜证=第1章，圆桌对质=第2章，指认/舆论=第3章。
            investigate 切到 2 会摘掉「现场搜证」（P4 已踩过的坑）。 */
-        if (p.stage) state.stage = p.stage;
-        if (p.stage && ({ break_ice: 1, investigate: 1, round_table: 2, accuse: 3 })[p.stage])
-          state.act = ({ break_ice: 1, investigate: 1, round_table: 2, accuse: 3 })[p.stage];
+        if (p.stage) {
+          syncLiveStage({ stage: p.stage, round: p.round, actions_left: p.actions_left });
+          if (p.stage !== 'break_ice') state.studioNeedAdvance = false;
+        }
+        if (Array.isArray(p.seats)) state.partySeats = p.seats;
         break;
       case 'ap_sync':
         if (!p.player_id || p.player_id === state.playerId) {
@@ -2093,10 +2140,17 @@
     if (state.demo) {
       hint = '演示模式：章节门控已豁免，可直接跳章';
     } else if (act === 1) {
-      cleared = !!(state.clues['clue_021'] || state.clues['clue_004']
+      const firstClue = !!(state.clues['clue_021'] || state.clues['clue_004']
         || state.clues['clue_002'] || state.clues['clue_007']
         || state.clues['clue_001'] || state.clues['clue_006']);
-      hint = cleared ? '「记忆芯片空盒」已入袋——芯片去向有了第一条实线' : '还差关键证物「记忆芯片空盒」（提示：去档案室搜「芯片」）';
+      /* 真实引擎的第一幕由 break_ice → investigate → round_table 线性推进。
+         WS 模式必须同时看到真人搜证地点，否则 AI/聊天附带线索不能伪造搜证进度。 */
+      const liveSearchReady = state.netKind !== 'ws'
+        || Object.keys(state.searched || {}).length > 0;
+      cleared = firstClue && liveSearchReady;
+      hint = cleared ? '关键线索已入袋——点击「进入下一章」完成第一幕'
+        : (!liveSearchReady ? '请先通过现场搜证记录一个地点，再推进第一幕'
+          : '先进入现场搜证，找到第一张关键线索卡');
     } else if (act === 2) {
       cleared = state.tamperPts >= 2;
       hint = cleared ? '篡改点 ' + state.tamperPts + '/2——时间线的裂缝已经攥在手里' : '还差 ' + (2 - state.tamperPts) + ' 个篡改点（提示：记忆修复找出两层矛盾）';
@@ -2202,6 +2256,27 @@
   function aiSkillSys(evt) {
     chat('sys', aiActWho(evt).name + '使用了技能', { kind: 'counsel', aiAct: true });
   }
+  function resetAiStatus() {
+    const ux = window.UX;
+    if (!ux || !ux.ai) return;
+    Object.assign(ux.ai, { state: 'loading', label: '正在检测 AI', detail: '正在核对本幕 NPC AI 状态', seats: [] });
+    if (typeof ux.probeEngine === 'function') ux.probeEngine({ silent: true });
+  }
+
+  /* WS 搜证回执：Mock 引擎在 Engine.search 内已登记 state.searched，
+     真实引擎则只发 search_result/clue_gained，前端必须镜像当前真人的搜证事实。
+     trigger 非空时仅接受 search:*，排除聊天/开导/辟谣附带发放的线索。 */
+  function noteLiveSearch(evt) {
+    if (state.netKind !== 'ws') return;
+    const actor = String(evt && evt.actor || '');
+    if (!state.playerId || actor !== String(state.playerId) || actor.indexOf('player:ai:') === 0) return;
+    const p = (evt && evt.payload) || {};
+    if (p.booklet_act || p.source !== 'engine') return;
+    const trigger = String(p.trigger || '');
+    if (trigger && trigger.indexOf('search:') !== 0) return;
+    const loc = resolveLoc(p.location || '').id;
+    if (loc) state.searched[loc] = Math.max(1, Number(state.searched[loc]) || 0);
+  }
 
   /* ---------- 事件应用（Mock / WS 共用入口） ---------- */
   const socialMessagesSeen = new Set();
@@ -2264,6 +2339,8 @@
         if (p.actSet !== undefined) {
           const prevAct = state.act;
           state.act = Math.min(3, Math.max(1, Number(p.actSet) || 1));
+          state.aiLastDecision = null;
+          resetAiStatus();
           banner(`第 ${'一二三'[state.act - 1]}幕开启`, 'act'); pushDmaku(M.danmaku.start, 'sys');
           if (state.act >= 3) grantFinaleFlaw();
           /* V4 综艺流程：幕切换插入转场全屏页（act_t2/act_t3，2.5s 自动过或点击跳过） */
@@ -2291,6 +2368,7 @@
       }
       case 'danmaku': pushDmaku(p.items || [], evt.actor === 'dm' ? 'dm' : ''); break;
       case 'search_result':
+        noteLiveSearch(evt);
         if (!evt.actor || !String(evt.actor).startsWith('player:') || evt.actor === state.playerId) {
           state.lastSearchResult = evt;
         }
@@ -2301,11 +2379,12 @@
         if (!p.hit) {
           playSfx('miss');
           const locName = Labels.place(p.location);
-          chat('sys', `【搜证 · ${locName}】${p.ambient || '一无所获。'}`, { kind: 'ambient' });
+          chat('sys', `【搜证 · ${locName} · 环境反馈，不入证物袋】${p.ambient || '一无所获。'}`, { kind: 'ambient' });
           pushDmaku(p.danmaku || M.danmaku.miss, 'gray');
         }
         break;
       case 'clue_gained': {
+        noteLiveSearch(evt);
         if (p.booklet_act && !aiMine) {
           aiSearchSys(evt);
           break;
@@ -2486,10 +2565,8 @@
         break;
       }
       case 'vote':
+        state.voteResult = Object.assign({ evidence: p.evidence || [], coverage: p.coverage || { pct: 0 } }, p);
         if (p.ending || p.outcome || p.tie) {
-          state.voteResult = Object.assign({
-            evidence: p.evidence || [], coverage: p.coverage || { pct: 0 }
-          }, p);
           if (p.tie) {
             state.voteResult.tie = true;
             state.ending = state.ending || 'hung';
@@ -2503,7 +2580,11 @@
         break;
       case 'ending':
         /* 引擎 outcome 与 mock ending_id 共用 ENDING_TO_UI */
-        state.ended = true; state.ending = p.ending_id || ENDING_TO_UI[p.outcome] || p.outcome || null; state.view = 'ending';
+        state.ended = true; state.ending = p.ending_id || ENDING_TO_UI[p.outcome] || p.outcome || null;
+        state.endingSummary = { title: p.title || '', desc: p.desc || '', outcome: p.outcome || '', accused: p.accused || (state.voteResult && state.voteResult.target) || '' };
+        chat('sys', '【终局结算】' + (p.title || state.ending || '本局结算') + (p.desc ? '：' + p.desc : '。'), { kind: 'counsel' });
+        toast('结算已完成：' + (p.title || state.ending || '请查看结果摘要'), 'good');
+        state.view = 'ending';
         if (state.showtime) state.showtime.step = 'reveal';  // V4 综艺流程：揭晓复盘环节
         pushDmaku(M.danmaku.vote.concat(M.danmaku.boss), 'sys');
         if (p.profile) {
@@ -2544,12 +2625,14 @@
   /* ---------- 存档 ---------- */
   function save() {
     try {
+      if (!saveCreatedAt) saveCreatedAt = Date.now();
       const snap = JSON.parse(JSON.stringify({
+        schemaVersion: SAVE_SCHEMA_VERSION, createdAt: saveCreatedAt, savedAt: Date.now(),
         act: state.act, round: state.round, ap: state.ap, apMax: state.apMax, heat: state.heat,
         flaws: state.flaws, clues: state.clues, kcards: state.kcards, memVer: state.memVer,
         heartUnlocked: state.heartUnlocked, counsel: state.counsel, refuted: state.refuted,
         synth: state.synth, posts: state.posts, hotfeedPanel: state.hotfeedPanel, hotfeedSignals: state.hotfeedSignals, salt: state.salt, ended: state.ending ? true : false,
-        ending: state.ending, searched: state.searched, demo: state.demo, bossSeen: state.bossSeen,
+        ending: state.ending, endingSummary: state.endingSummary, searched: state.searched, demo: state.demo, bossSeen: state.bossSeen,
         /* V31 增量 */
         zans: state.zans, glitchFree: state.glitchFree, glitchPerAct: state.glitchPerAct,
         tamperPts: state.tamperPts, photos: state.photos, er: state.er, erLimit: state.erLimit,
@@ -2573,12 +2656,25 @@
         firstVote: { open: false, poll_id: state.firstVote.poll_id, pick: state.firstVote.pick, done: state.firstVote.done, tally: state.firstVote.tally }
       }));
       localStorage.setItem(SAVE_KEY, JSON.stringify(snap));
-    } catch (e) { /* 隐身模式等忽略 */ }
+      saveFailureNotified = false;
+    } catch (e) {
+      if (!saveFailureNotified) {
+        saveFailureNotified = true;
+        toast('本地存档写入失败：请检查浏览器存储空间或隐私设置', 'warn');
+      }
+    }
   }
   function load() {
     try {
       const raw = localStorage.getItem(SAVE_KEY); if (!raw) return;
       const s = JSON.parse(raw);
+      const version = s && s.schemaVersion == null ? 1 : Number(s && s.schemaVersion);
+      if (!s || Array.isArray(s) || !Number.isFinite(version) || version < 1 || version > SAVE_SCHEMA_VERSION
+          || (s.act != null && (!Number.isFinite(Number(s.act)) || Number(s.act) < 1 || Number(s.act) > 3))
+          || (s.round != null && (!Number.isFinite(Number(s.round)) || Number(s.round) < 1))
+          || (s.clues != null && (typeof s.clues !== 'object' || Array.isArray(s.clues)))
+          || (s.kcards != null && (typeof s.kcards !== 'object' || Array.isArray(s.kcards)))) throw new Error('invalid save schema');
+      saveCreatedAt = Number(s.createdAt) || Date.now();
       Object.keys(s).forEach(k => { if (k in state) state[k] = s[k]; });
       if (state.mode !== 'party') {
         state.roomCode = '';
@@ -2595,7 +2691,10 @@
       try {
         if (!new URLSearchParams(location.search).get('room')) state.phase = 'menu';
       } catch (e2) { state.phase = 'menu'; }
-    } catch (e) { }
+    } catch (e) {
+      try { localStorage.removeItem(SAVE_KEY); } catch (e2) { }
+      toast('本地存档已损坏或版本不兼容，已清理并从新局开始', 'warn');
+    }
   }
   function reset() { localStorage.removeItem(SAVE_KEY); state.phase = 'cover'; location.reload(); }
   // 回访玩家：保留存档但一律先见主菜单（菜单上提供「继续上次对局」入口）
@@ -2664,6 +2763,39 @@
     state.studioBooks = (pack.books || []).slice();
   }
 
+  function syncLiveStage(snapshot, opts) {
+    const s = snapshot || {};
+    const stage = String(s.stage || '').trim();
+    if (stage && ({ break_ice: 1, investigate: 1, round_table: 1, accuse: 1, review: 1 })[stage]) {
+      state.stage = stage;
+      const stageAct = { break_ice: 1, investigate: 1, round_table: 2, accuse: 3, review: 3 }[stage];
+      if (stageAct) state.act = stageAct;
+      if (stage === 'break_ice') {
+        state.skipIce = false;
+        if (opts && opts.studio) state.studioNeedAdvance = true;
+      } else {
+        state.skipIce = true;
+        state.studioNeedAdvance = false;
+      }
+    }
+    if (s.round != null) state.round = Number(s.round) || state.round;
+    if (s.actions_left != null) state.ap = Number(s.actions_left);
+    else if (s.ap_state && state.playerId && s.ap_state[state.playerId] != null) state.ap = Number(s.ap_state[state.playerId]);
+  }
+
+  async function syncLiveSessionState() {
+    if (!state.sessionId || state.sessionId === '-' || !state.netKind || state.netKind === 'mock') return false;
+    const sid = state.sessionId;
+    try {
+      const r = await fetch('/api/session/' + encodeURIComponent(sid));
+      if (!r.ok || sid !== state.sessionId) return false;
+      const j = await r.json();
+      const snapshot = j.session || j;
+      syncLiveStage(snapshot, { studio: !!state.scenarioId });
+      return true;
+    } catch (e) { return false; }
+  }
+
   function resetPlayForStudio() {
     state.act = 1; state.round = 1; state.ap = 3; state.apMax = 3; state.heat = 35;
     state.flaws = {}; state.clues = {}; state.kcards = {}; state.heartUnlocked = {};
@@ -2673,7 +2805,11 @@
     state.hotfeedPanel = null; state.hotfeedSignals = null;
     state.lastSearchResult = null;
     state.exposedFakes = {}; state.salt = 0; state.chat = []; state.currentNpc = 'dm';
-    state.ended = false; state.ending = null; state.voteResult = null;
+        state.ended = false; state.ending = null; state.endingSummary = null; state.voteResult = null;
+    state.studioBookLoading = '';
+    state.studioBookError = '';
+    state.aiLastDecision = null;
+    resetAiStatus();
     state.pollution = { case: null, result: null, ammo: 0, earned: 0, done: {}, summary: null };
     state.echo = { log: [], seq: 0, challenge: null, result: null, defended: false, tease: 0 };
     state.debate = { open: false, stance: 'open', score: 0, need: 4, text: '', rounds: [], convinced: false };
@@ -2731,7 +2867,7 @@
     }
     if (!state.kcards['kc_01']) state.kcards['kc_01'] = { at: state.round };
     if (state.netKind === 'ws') {
-      Store.send('skill', { kind: 'judge_line', skill: 'judge_line' });
+      Store.send('skill', { kind: 'judge_line', skill: 'judge_line', demo_bypass: true });
     } else {
       Engine.judge_line({}, (type, pl) => applyEvent({ type: type, payload: pl, actor: 'sys' }));
     }
@@ -2813,20 +2949,35 @@
         applyStudioPack(pack);
         resetPlayForStudio();
         state.playerBook = null;
+        state.studioBookLoading = '';
+        state.studioBookError = '';
         state.bookOpen = false;
         const pid = (window.myPlayerId ? window.myPlayerId() : 'player:1');
         try {
           const sr = await fetch('/api/session', {
             method: 'POST',
             headers: this.llmHeaders(),
-            body: JSON.stringify({ mode: 'quick', scenario_id: id, player_id: pid })
+            body: JSON.stringify({ mode: 'party', scenario_id: id, player_id: pid })
           });
           if (sr.ok) {
             const sj = await sr.json();
             if (sj.ok && sj.session) {
               state.sessionId = sj.session.session_id;
               state.playerId = pid;
+              state.mode = 'party';
+              state.isHost = true;
+              state.isSpectator = false;
+              state.roomCode = sj.session.room_code || ((sj.events || [])[0] || {}).payload?.room_code || '';
+              if (Array.isArray(sj.session.seats)) state.partySeats = sj.session.seats;
+              syncLiveStage(sj.session, { studio: true });
               const wsUrl = partyWsUrl(sj.session.session_id, pid, false);
+              window.sessionStorage.setItem('party_ws', wsUrl);
+              if (state.roomCode) {
+                const base = await resolveShareBase();
+                state.lanBase = base;
+                state.shareUrl = base + '/?room=' + encodeURIComponent(state.roomCode);
+                savePartyTicket({ code: state.roomCode, sid: state.sessionId, phase: 'seat', host: true });
+              }
               await Store.connectParty(wsUrl);
             }
           } else {
@@ -2835,8 +2986,10 @@
         } catch (e) {
           toast('会话/WS 未接通，仍可本地试玩水合数据', 'warn');
         }
-        if ((state.studioBooks || []).length) {
+        if (state.mode === 'party' || (state.studioBooks || []).length) {
           state.playerBook = null;
+          state.studioBookLoading = '';
+          state.studioBookError = '';
           state.bookOpen = false;
           state.phase = 'seat';
           if (window.UX && window.UX.markOnboarded) window.UX.markOnboarded();
@@ -2847,7 +3000,9 @@
         state.view = 'chat';
         if (window.UX && window.UX.markOnboarded) window.UX.markOnboarded();
         chat('dm', pack.hook || state.studioMeta.hook || '叮——新本已装载，请先圆桌破冰。', {});
-        chat('sys', '【快本 · ' + (state.studioMeta.title || '未命名本') + '】第一幕破冰：只许圆桌对话，点「开始搜证」后再进地图。', { kind: 'counsel' });
+        chat('sys', state.stage === 'investigate'
+          ? '【快本 · ' + (state.studioMeta.title || '未命名本') + '】第一幕已开：请进入现场搜证。'
+          : '【快本 · ' + (state.studioMeta.title || '未命名本') + '】第一幕破冰：只许圆桌对话，完成后点击「开始搜证」。', { kind: 'counsel' });
         save();
         return true;
       } catch (e) {
@@ -2856,19 +3011,32 @@
       }
     },
     finishStudioBreakIce() {
-      if (!state.studioNeedAdvance) return;
-      Store.send('advance', {});
+      if (state.stage !== 'break_ice') {
+        state.studioNeedAdvance = false;
+        state.view = 'map';
+        return true;
+      }
+      const spoken = (state.chat || []).some(m => m.actor === 'npc');
+      const ready = !!state.dmBookRead && spoken;
+      if ((!state.studioNeedAdvance && !ready) || state.busy) return false;
+      const ok = Store.send('advance', {});
+      if (ok === false) return false;
       state.studioNeedAdvance = false;
-      state.stage = 'investigate';
-      toast('破冰结束，可以进入现场搜证了', 'good');
+      toast('破冰结束，正在打开现场搜证…', 'good');
+      return true;
     },
     startPrologue() {
       // 从剧本入口开始即视为新局：清除旧的本地快照，避免菜单继续提示恢复上局。
+      if (state.studioBookLoading) {
+        toast('故事本领取中，请稍候…', 'warn');
+        return false;
+      }
       try { localStorage.removeItem(SAVE_KEY); } catch (e) { }
+      saveCreatedAt = Date.now();
       state.hasSave = false;
       if ((state.studioBooks || []).length && !state.playerBook) {
-        toast('先领取一本故事本', 'warn');
-        return;
+        toast(state.studioBookError || '先领取一本故事本', 'warn');
+        return false;
       }
       if (!state.partyChar) {
         try { state.partyChar = sessionStorage.getItem('party_char') || ''; } catch (e) { }
@@ -2978,6 +3146,7 @@
         if (sj.ok && sj.session) {
           state.sessionId = sj.session.session_id;
           state.playerId = pid;
+          syncLiveStage(sj.session);
           const wsUrl = partyWsUrl(sj.session.session_id, pid, false);
           await this.connectParty(wsUrl);
           return true;
@@ -3006,6 +3175,7 @@
       if (state.mode === 'party' && state.roomCode) {
         this.joinRoom(state.roomCode).then(ok => {
           if (ok) { state.phase = 'play'; state.view = 'chat'; if (state.showtime) state.showtime.step = 'act'; }
+          else toast('房间恢复失败：房间可能已过期或席位仍由 AI 接管，请重新入房', 'warn');
         });
         return;
       }
@@ -3038,6 +3208,8 @@
       playSfx('click');
       state.studioBooks = [];
       state.playerBook = null;
+      state.studioBookLoading = '';
+      state.studioBookError = '';
       state.bookOpen = false;
       if (m === 'party') {
         state.mode = 'party';
@@ -3169,25 +3341,52 @@
     bookletDismiss() { state.bookletForced = null; state.bookletOpen = false; if (state.bookletPack || state.playerBook) state.dmBookRead = true; },
     async pickStudioChar(id) {
       id = String(id || '').trim();
-      if (!id) return false;
-      state.partyChar = id;
-      try { sessionStorage.setItem('party_char', id); } catch (e) { }
+      if (!id || state.studioBookLoading) return false;
       const sid = state.scenarioId;
       if (!sid) { toast('缺少剧本编号', 'warn'); return false; }
+      const prevId = state.partyChar;
+      const prevBook = state.playerBook;
+      let prevSessionChar = '';
+      try { prevSessionChar = sessionStorage.getItem('party_char') || ''; } catch (e) { }
+      const restoreSessionChar = () => {
+        try {
+          if (prevSessionChar) sessionStorage.setItem('party_char', prevSessionChar);
+          else sessionStorage.removeItem('party_char');
+        } catch (e) { }
+      };
+      state.partyChar = id;
+      state.playerBook = null;
+      state.studioBookLoading = id;
+      state.studioBookError = '';
+      try { sessionStorage.setItem('party_char', id); } catch (e) { }
       try {
         const r = await fetch('/api/studio/' + encodeURIComponent(sid) + '/book/' + encodeURIComponent(id));
         let j = null;
         try { j = await r.json(); } catch (e) { j = null; }
         if (!r.ok || !j || !j.ok || !j.book) {
-          toast(Labels.apiErr(j && (j.detail || j.message), '领取故事本失败'), 'warn');
+          const msg = Labels.apiErr(j && (j.detail || j.message), '领取故事本失败');
+          state.partyChar = prevId;
+          state.playerBook = prevBook;
+          restoreSessionChar();
+          state.studioBookError = msg;
+          toast(msg, 'warn');
           return false;
         }
         state.playerBook = j.book;
         return true;
       } catch (e) {
-        toast('领取故事本失败', 'warn');
+        state.partyChar = prevId;
+        state.playerBook = prevBook;
+        restoreSessionChar();
+        state.studioBookError = '领取故事本失败，请检查服务连接后重试';
+        toast(state.studioBookError, 'warn');
         return false;
+      } finally {
+        if (state.studioBookLoading === id) state.studioBookLoading = '';
       }
+    },
+    studioBookPending(id) {
+      return String(state.studioBookLoading || '') === String(id || '');
     },
     openMyBook() {
       if (!state.playerBook) { toast('还没有领取故事本', 'warn'); return false; }
@@ -3203,6 +3402,7 @@
         const r = await fetch('/api/session/' + encodeURIComponent(sid));
         if (!r.ok || sid !== state.sessionId) return;
         const j = await r.json(), snapshot = j.session || j;
+        syncLiveStage(snapshot);
         const ap = snapshot.ap_state && snapshot.ap_state[state.playerId];
         if (ap !== undefined) state.ap = ap;
         else if (snapshot.actions_left !== undefined) state.ap = snapshot.actions_left;
@@ -3556,7 +3756,7 @@
         this.requestAiWave({ retries: 4 });
       }
     },
-    state, Engine, applyEvent, toast, banner, pushDmaku, chat, aiSpeaking,
+    state, Engine, applyEvent, restorePartySeat, toast, banner, pushDmaku, chat, aiSpeaking, resetAiStatus,
     locClueLeft, locTier, flawCount, ownedClues, hasKc, heartOf, coverage, evidenceCoverage,
     studioMiniCatalog() {
       const reg = (window.Minis && window.Minis.REG) || {};
@@ -3569,13 +3769,15 @@
       return reg;
     },
     /* V4 综艺流程：卷宗页确认（→第一幕转场→破冰圆桌）/ 幕转场跳过 */
-    showtimeNext() {
+    async showtimeNext() {
       if (!state.showtime) return;
       if (state.showtime.step === 'case_file') {
         state.showtime.step = 'act';
         state.view = 'chat';
+        await syncLiveSessionState();
         if (state.skipIce || state.playMode === 'daily' || state.playMode === 'quick') {
           state.showtime.cut = null;
+          state.studioNeedAdvance = false;
           chat('sys', state.playMode === 'daily'
             ? '【每日挑战】破冰已跳过，现场搜证已开。今日词条在顶栏。'
             : '【快速局】破冰已跳过，直接搜证/对质。', { kind: 'counsel' });
@@ -3604,9 +3806,9 @@
     recapDismiss() { state.recap = null; },
     iceBlocksSearch() {
       if (state.skipIce || state.demo) return false;
-      if (state.studioNeedAdvance) return true;
       if ((state.studioBooks || []).length) return false;
       if (state.stage !== 'break_ice') return false;
+      if (state.studioNeedAdvance) return true;
       if (!state.dmBookRead) return true;
       const spoken = (state.chat || []).some(m => m.actor === 'npc');
       return !spoken;

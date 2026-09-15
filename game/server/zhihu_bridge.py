@@ -199,11 +199,25 @@ def fetch_knowledge_list(cache_dir: Path | None = None) -> list | None:
 
 def fetch_work(work_id: str, kind: str = "story",
                cache_dir: Path | None = None) -> dict | None:
-    """按 work_id 取详情。knowledge 与 story 共用 story/{work_id} 详情路径，
-    故 kind 仅作语义标记，实际走同一路径。"""
+    """按 work_id 取详情。2026-09 实测：knowledge/{work_id} 独立路径已可用，
+    story/{work_id} 对知识 work_id 返回 40404 —— 与早期文档的共用约定不一致。
+    策略：knowledge 先走独立路径，40404/失败回退 story 路径；story 直走原路径。"""
     if kind not in ("story", "knowledge"):
         return None
-    return fetch_story(work_id, cache_dir=cache_dir)
+    if kind == "story":
+        return fetch_story(work_id, cache_dir=cache_dir)
+    wid = str(work_id)
+    cached = _cache_read(cache_dir, f"knowledge_{wid}.json")
+    if cached is not None:
+        return cached
+    payload = _get_json_safe(f"{_HACKATHON_API}/knowledge/{wid}")
+    if not isinstance(payload, dict) or not payload.get("work_id"):
+        return fetch_story(work_id, cache_dir=cache_dir)  # 兜底旧约定
+    _cache_write(cache_dir, f"knowledge_{wid}.json", payload)
+    entry = _credit_entry(payload, f"{_HACKATHON_API}/knowledge/{wid}")
+    if entry:
+        _record_credits([entry], cache_dir)
+    return payload
 
 
 # ---------------------------------------------------------------- Z2 开放平台（可选）

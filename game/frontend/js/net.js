@@ -58,15 +58,18 @@
       this.BACKOFF = [800, 1500, 2500, 4000, 6000, 8000];
     }
     /* 连接状态广播（仅供体验层做提示，不改变任何既有事件语义） */
-    _status(state, note) {
-      this.emit('_status', { state: state, attempts: this.attempts, note: note || '', transport: 'ws' });
+    _status(state, note, extra) {
+      this.emit('_status', Object.assign({
+        state: state, attempts: this.attempts, note: note || '', transport: 'ws'
+      }, extra || {}));
     }
     _wire(ws) {
       ws.onmessage = (m) => { try { const evt = JSON.parse(m.data); this.emit(evt.type, evt); this.emit('*', evt); } catch (e) { console.warn('[ws] bad frame', e); } };
       ws.onopen = () => {
+        const reconnected = !!this.bootedOnce;
         this.ready = true; this.booted = true; this.attempts = 0;
         clearTimeout(this.rcTimer); this.rcTimer = null;
-        this._status('online', this.bootedOnce ? '实时通道已恢复' : '实时通道已建立');
+        this._status('online', reconnected ? '实时通道已恢复，正在恢复席位' : '实时通道已建立', { reconnected: reconnected });
         this.bootedOnce = true;
       };
       ws.onclose = () => {
@@ -105,7 +108,9 @@
     async boot() {
       // 1) 无 session 则先 REST 创建对局
       if (!this.sessionId) {
-        const base = this.url.replace(/^ws/, 'http').split('/ws')[0];
+        const base = (window.Api && window.Api.rewrite)
+          ? window.Api.rewrite(this.url.replace(/^ws/, 'http').split('/ws')[0])
+          : this.url.replace(/^ws/, 'http').split('/ws')[0];
         try {
           const apiCfg = (() => { try { return JSON.parse(localStorage.getItem('kanshan_api') || '{}'); } catch (e) { return {}; } })();
           const hdrs = { 'Content-Type': 'application/json' };
@@ -129,7 +134,11 @@
       if (this.playerId && this.realUrl.indexOf('player_id=') < 0) {
         this.realUrl += (this.realUrl.indexOf('?') >= 0 ? '&' : '?') + 'player_id=' + encodeURIComponent(this.playerId);
       }
-      // 2) 打开事件流
+      // 2) 打开事件流。保存改写后的地址，自动重连沿用同一条直连路径。
+      if (window.Api && window.Api.rewrite) {
+        this.realUrl = window.Api.rewrite(this.realUrl)
+          .replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
+      }
       return new Promise((resolve, reject) => {
         const ws = this._wire(new WebSocket(this.realUrl));
         this.ws = ws;

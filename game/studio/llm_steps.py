@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from . import mock_bible
+from .evidence_contract import ensure_evidence_playability
 from .tiers import KC_COPY, LOCATION_META, QUOTA, TIERS
 
 LAST_PROVIDER = "main"
@@ -236,10 +237,12 @@ def _repair_truncated(text: str) -> str:
 # ------------------------------------------------------------------ 三步
 
 
-def _step_world(client, seed: str, skeleton: dict, *, inner_boss: bool = False) -> dict:
+def _step_world(client, seed: str, skeleton: dict, *, inner_boss: bool = False, material: str = "") -> dict:
     system, user = _render_prompt("studio_world.md", seed=seed)
     if _golden_slice("world"):
         user = f"{user}\n\n{_golden_slice('world')}"
+    if material:
+        user = f"{user}\n\n{material}"
     raw = _llm_json(client, system, user, step="world")
     world = _patch_world(raw, skeleton["world"], inner_boss=inner_boss)
     _assert_world(world)
@@ -254,18 +257,20 @@ _DETAIL_SHRINK_HINT = (
 )
 
 
-def _step_detail(client, seed: str, world: dict, skeleton: dict) -> dict:
+def _step_detail(client, seed: str, world: dict, skeleton: dict, *, material: str = "") -> dict:
     world_json = json.dumps(world, ensure_ascii=False, indent=2)
     system, user = _render_prompt("studio_detail.md", seed=seed, world_json=world_json)
     if _golden_slice("detail"):
         user = f"{user}\n\n{_golden_slice('detail')}"
+    if material:
+        user = f"{user}\n\n{material}"
     raw = _llm_json(client, system, user, step="detail", shrink_hint=_DETAIL_SHRINK_HINT)
     detail = _patch_detail(raw, skeleton["detail"], world)
     _assert_detail(detail)
     return detail
 
 
-def _step_acts(client, seed: str, world: dict, detail: dict, skeleton: dict) -> dict:
+def _step_acts(client, seed: str, world: dict, detail: dict, skeleton: dict, *, material: str = "") -> dict:
     world_json = json.dumps(
         {
             "title": world.get("title"),
@@ -286,6 +291,8 @@ def _step_acts(client, seed: str, world: dict, detail: dict, skeleton: dict) -> 
     )
     if _golden_slice("acts"):
         user = f"{user}\n\n{_golden_slice('acts')}"
+    if material:
+        user = f"{user}\n\n{material}"
     raw = _llm_json(client, system, user, step="acts")
     acts = _patch_acts(raw, skeleton["acts"])
     _assert_acts(acts)
@@ -376,6 +383,8 @@ def _patch_detail(raw: dict, skeleton: dict, world: dict) -> dict:
     )
     detail["truth_nodes"] = _fix_truth_nodes(
         detail.get("truth_nodes") or raw.get("truth_nodes") or skeleton["truth_nodes"])
+    # The runtime composes evidence from clue links, not proof_clues alone.
+    ensure_evidence_playability(detail)
     detail["culprit"] = _fix_culprit(
         detail.get("culprit") or raw.get("culprit") or skeleton["culprit"], world)
     detail["kc_plan"] = _fix_kc_plan(detail.get("kc_plan") or raw.get("kc_plan"))

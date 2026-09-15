@@ -116,6 +116,16 @@ class TestGenerateBooks:
     def test_gate_ok(self, ready_job):
         assert ready_job["gate"]["ok"], ready_job["gate"].get("errors")
 
+    def test_runtime_booklets_are_loadable(self, ready_job):
+        root = studio_scenario_dir(ready_job["id"])
+        from engine.booklet import BookletLibrary
+        lib = BookletLibrary(root)
+        assert {"char_01", "char_02", "char_03", "char_04"} <= set(lib.roles)
+        assert "investigator" in lib.roles
+        for rid in ("char_01", "char_02", "char_03", "char_04", "investigator"):
+            assert lib.resolve_role(rid, solo=True) == rid
+            assert set(lib.roles[rid]["covers"]) == {"A", "B", "C"}
+
     def test_four_json_and_md_contain_you_are(self, ready_job):
         root = studio_scenario_dir(ready_job["id"])
         scripts = root / "scripts"

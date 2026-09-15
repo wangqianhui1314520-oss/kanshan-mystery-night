@@ -116,13 +116,19 @@ def _iter_seat_rows(session: dict):
 
 
 def vacant_ai_roles(session: dict) -> list[str]:
-    """空席角色 id：无人真人认领、非调查员，供 AI 按本行动。"""
+    """空席角色 id：无人真人认领、非调查员且有可读闭卷。"""
+    lib = library_of(session)
+    available = set(lib.roles)
     roles: list[str] = []
     for n in session.get("npcs") or []:
         cid = n.get("id") if isinstance(n, dict) else None
-        if cid and cid not in roles:
+        if cid and cid not in roles and (not available or str(cid) in available):
             roles.append(str(cid))
     if not roles:
+        roles = [rid for rid in sorted(available) if rid != "investigator"]
+    if not roles and not available:
+        # Keep legacy unit fixtures useful; real generated sessions are rejected
+        # by scenario_resolve before this fallback can affect gameplay.
         roles = [f"char_{i:02d}" for i in range(1, 9)]
 
     claimed = {str(rid) for rid in (session.get("booklet_roles") or {}).values()

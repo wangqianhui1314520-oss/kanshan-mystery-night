@@ -13,9 +13,11 @@
   const StudioView = {
     setup() {
       const S = window.Store.state;
-      const step = ref('hook');
+      const step = ref('s1');
       const useLlm = ref(false);
       const generating = ref(false);
+      const genNote = ref('');
+      const useZhihu = ref(false);
       const history = ref([]);
       const draftSavedAt = ref('');
       const snapshots = ref([]);
@@ -30,6 +32,8 @@
       const job = computed(() => S.studioJob);
       const world = computed(() => (job.value && job.value.world) || {});
       const gate = computed(() => (job.value && job.value.gate) || { ok: false, errors: [], warnings: [] });
+      const narrCount = computed(() => ((gate.value.errors || []).filter(e => String(e).indexOf('NARR') === 0).length)
+        + ((gate.value.warnings || []).filter(w => String(w).indexOf('NARR') === 0).length));
       const acts = computed(() => C.normActs(job.value));
       const clues = computed(() => ((job.value && job.value.detail && job.value.detail.clues) || []));
       const nodes = computed(() => ((job.value && job.value.detail && job.value.detail.truth_nodes) || []));
@@ -78,9 +82,9 @@
         return scores;
       });
       const current = computed(() => STEPS.find(s => s.id === step.value) || STEPS[0]);
-      const visibleSteps = computed(() => STEPS.filter(s => showAdvanced.value || ['hook','type','lock','cast','truth','gate','play'].includes(s.id)));
+      const visibleSteps = computed(() => STEPS);
       const stepIndex = computed(() => visibleSteps.value.findIndex(s => s.id === step.value));
-      watch(showAdvanced, () => { if (!visibleSteps.value.some(s => s.id === step.value)) step.value = 'hook'; });
+      watch(visibleSteps, () => { if (!visibleSteps.value.some(s => s.id === step.value)) step.value = 's1'; });
       const typeName = computed(() => {
         const t = PACK_TYPES.find(x => x.id === brief.pack_type);
         return t ? t.name : ((window.Labels && window.Labels.plain(brief.pack_type, '未选本型')) || '未选本型');
@@ -102,14 +106,196 @@
         play: canPlay.value
       }));
 
-      const markOf = (id) => {
-        if (id === 'gate') return gate.value.ok ? 'ready' : (job.value ? 'bad' : (filled.value[id] ? 'edit' : ''));
-        if (id === 'play') return canPlay.value ? 'ready' : '';
-        if (job.value && (id !== 'hook' || filled.value.hook)) return 'gen';
-        return filled.value[id] ? 'edit' : '';
-      };
+      const markOf = (id) => stageMark(id);
 
       const pickPreset = (text) => { brief.hook = text; };
+
+      const hotItems = ref([]);
+      const hotNote = ref('');
+      const hotLoading = ref(false);
+      const loadHot = async () => {
+        if (hotLoading.value) return;
+        hotLoading.value = true;
+        hotNote.value = '拉取知乎热榜…';
+        try {
+          const r = await fetch('/api/studio/zhihu/hot');
+          const j = await r.json();
+          hotItems.value = (j && j.ok && Array.isArray(j.items)) ? j.items : [];
+          hotNote.value = hotItems.value.length
+            ? '点议题直接填入钩子'
+            : ((j && j.notice) || '热榜暂不可用，可手写钩子');
+        } catch (e) {
+          hotItems.value = [];
+          hotNote.value = '热榜暂不可用（需服务端），可手写钩子';
+        }
+        hotLoading.value = false;
+      };
+      const pickHot = (t) => { brief.hook = t; };
+
+      /* —— 七阶段制作流水线（行业流程：真相先行 → 角色 → 幕次 → 过闸） —— */
+      const draft = reactive({ draft_id: '', world: null, detail: null, acts: null, providers: {}, gate: null, scenario_id: '', status: '', generation: {}, agents: {}, locks: {}, provenance: {}, validation: {} });
+      const stageBusy = ref('');
+      const locks = reactive({ truth: false, cast: false, acts: false });
+      const apiPost = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(async r => { const j = await r.json(); if (!r.ok || j.ok === false) throw new Error((j && (j.detail || j.message)) || ('HTTP ' + r.status)); return j; });
+      function syncDraftMeta(j) {
+        if (!j) return;
+        ['generation', 'agents', 'locks', 'provenance', 'validation'].forEach(k => {
+          if (j[k] !== undefined) draft[k] = j[k] || {};
+        });
+        const d = j.draft || {};
+        if (d.world !== undefined) draft.world = d.world;
+        if (d.detail !== undefined) draft.detail = d.detail;
+        if (d.acts !== undefined) draft.acts = d.acts;
+        if (d.providers) draft.providers = d.providers;
+        if (d.gate !== undefined) draft.gate = d.gate;
+        if (d.scenario_id !== undefined) draft.scenario_id = d.scenario_id;
+        if (d.status !== undefined) draft.status = d.status;
+        const serverLocks = draft.locks || {};
+        ['truth', 'cast', 'acts'].forEach(stage => { locks[stage] = !!serverLocks[stage]; });
+      }
+      const stageDeps = { truth: '无', cast: 'truth', acts: 'cast', assemble: 'acts' };
+      const agentRows = computed(() => Object.keys(draft.agents || {}).map(stage => ({
+        ...(draft.agents[stage] || {}), dependencies: stageDeps[stage] || '无'
+      })));
+      const stageStatus = status => ({ pending: '待开始', running: '执行中', succeeded: '已完成', awaiting_human: '待人工确认', failed: '失败', blocked: '已阻塞' }[status] || status || '未知');
+      async function unlockStage(stage) {
+        if (!draft.draft_id) return;
+        stageBusy.value = 'unlock-' + stage;
+        try {
+          const j = await apiPost('/api/studio/draft/' + draft.draft_id + '/stage/' + stage + '/unlock', {});
+          syncDraftMeta(j);
+          const target = { truth: 's2', cast: 's3', acts: 's4' }[stage] || 's1';
+          step.value = target;
+          window.Store.toast('已解锁' + stage + '阶段；下游产物需要重新生成', 'warn');
+        } catch (e) { window.Store.toast('解锁失败：' + e.message, 'warn'); }
+        stageBusy.value = '';
+      }
+      async function beginDraft() {
+        if (!brief.hook.trim()) { window.Store.toast('先写一句话钩子', 'warn'); step.value = 's1'; return; }
+        stageBusy.value = 's1';
+        try {
+          const j = await apiPost('/api/studio/draft', { seed: brief.hook.trim(), brief: JSON.parse(JSON.stringify(brief)), inner_boss: !!brief.modules.inner_boss });
+          draft.draft_id = j.draft_id;
+          syncDraftMeta(j);
+          locks.truth = false; locks.cast = false; locks.acts = false;
+          window.Store.toast('立项已确认 · 进入真相设计（真相先行铁律）', 'good');
+          step.value = 's2';
+        } catch (e) { window.Store.toast('立项失败：' + e.message, 'warn'); }
+        stageBusy.value = '';
+      }
+      async function genTruth() {
+        if (!draft.draft_id) { window.Store.toast('先在 01 立项确认', 'warn'); return; }
+        stageBusy.value = 'truth';
+        try {
+          const j = await apiPost('/api/studio/draft/' + draft.draft_id + '/stage/truth', { use_llm: useLlm.value, use_zhihu: useZhihu.value });
+          draft.world = j.world; draft.providers.truth = j.provider;
+          syncDraftMeta(j);
+          locks.truth = false;
+          window.Store.toast('真相草案已生成（' + j.provider + '）· 编辑后点「锁定真相」', 'good');
+        } catch (e) { window.Store.toast('真相生成失败：' + e.message, 'warn'); }
+        stageBusy.value = '';
+      }
+      async function confirmTruth() {
+        if (!draft.world || !draft.draft_id) { window.Store.toast('先点「AI 写真相草案」', 'warn'); return; }
+        stageBusy.value = 'lock-truth';
+        try {
+          const j = await apiPost('/api/studio/draft/' + draft.draft_id + '/stage/truth/lock', { output: JSON.parse(JSON.stringify(draft.world)) });
+          syncDraftMeta(j);
+          if (locks.truth) { step.value = 's3'; window.Store.toast('真相已锁定 · 进入角色设定', 'good'); }
+        } catch (e) { window.Store.toast('真相锁定失败：' + e.message, 'warn'); }
+        stageBusy.value = '';
+      }
+      async function genCast() {
+        if (!draft.draft_id || !draft.world) { window.Store.toast('真相未锁定（真相先行铁律）', 'warn'); return; }
+        stageBusy.value = 'cast';
+        try {
+          const j = await apiPost('/api/studio/draft/' + draft.draft_id + '/stage/cast', { world: JSON.parse(JSON.stringify(draft.world)), use_llm: useLlm.value, use_zhihu: useZhihu.value });
+          draft.detail = j.detail; draft.providers.cast = j.provider;
+          syncDraftMeta(j);
+          (j.characters || []).forEach((c, i) => {
+            if (!brief.cast[i]) return;
+            brief.cast[i].name = c.name || brief.cast[i].name;
+            brief.cast[i].archetype = c.archetype || brief.cast[i].archetype;
+            brief.cast[i].comedy_hook = c.comedy_hook || '';
+            brief.cast[i].public_bio = c.public_bio || '';
+          });
+          locks.cast = false;
+          window.Store.toast('角色草案已生成 · 名字人设由你改写后「锁定角色」', 'good');
+        } catch (e) { window.Store.toast('角色生成失败：' + e.message, 'warn'); }
+        stageBusy.value = '';
+      }
+      async function confirmCast() {
+        if (!draft.detail || !draft.draft_id) { window.Store.toast('先点「AI 写角色草案」', 'warn'); return; }
+        /* 用户编辑回写 detail（名字/人设/腔调/公开简历） */
+        (draft.detail.characters || []).forEach((c, i) => {
+          if (!brief.cast[i]) return;
+          c.name = brief.cast[i].name || c.name;
+          c.archetype = brief.cast[i].archetype || c.archetype;
+          c.comedy_hook = brief.cast[i].comedy_hook || c.comedy_hook;
+          c.public_bio = brief.cast[i].public_bio || c.public_bio;
+        });
+        stageBusy.value = 'lock-cast';
+        try {
+          const j = await apiPost('/api/studio/draft/' + draft.draft_id + '/stage/cast/lock', { output: JSON.parse(JSON.stringify(draft.detail)) });
+          syncDraftMeta(j);
+          if (locks.cast) { step.value = 's4'; window.Store.toast('角色已锁定 · 进入幕次与线索编排', 'good'); }
+        } catch (e) { window.Store.toast('角色锁定失败：' + e.message, 'warn'); }
+        stageBusy.value = '';
+      }
+      async function genActs() {
+        if (!draft.draft_id || !locks.cast) { window.Store.toast('角色未锁定（按流程：真相 → 角色 → 幕次）', 'warn'); return; }
+        stageBusy.value = 'acts';
+        try {
+          const j = await apiPost('/api/studio/draft/' + draft.draft_id + '/stage/acts', { world: JSON.parse(JSON.stringify(draft.world)), detail: JSON.parse(JSON.stringify(draft.detail)), use_llm: useLlm.value, use_zhihu: useZhihu.value });
+          draft.acts = j.acts; draft.providers.acts = j.provider;
+          syncDraftMeta(j);
+          (draft.acts.acts || []).forEach((a, i) => { if (brief.acts[i]) { brief.acts[i].name = a.name || brief.acts[i].name; brief.acts[i].brief = a.brief || brief.acts[i].brief; } });
+          locks.acts = false;
+          window.Store.toast('幕次与线索草案已生成 · 调整节奏后「锁定幕次」', 'good');
+        } catch (e) { window.Store.toast('幕次生成失败：' + e.message, 'warn'); }
+        stageBusy.value = '';
+      }
+      async function confirmActs() {
+        if (!draft.acts || !draft.draft_id) { window.Store.toast('先点「AI 写幕次与线索」', 'warn'); return; }
+        (draft.acts.acts || []).forEach((a, i) => { if (brief.acts[i]) { a.name = brief.acts[i].name || a.name; a.brief = brief.acts[i].brief || a.brief; } });
+        stageBusy.value = 'lock-acts';
+        try {
+          const j = await apiPost('/api/studio/draft/' + draft.draft_id + '/stage/acts/lock', { output: JSON.parse(JSON.stringify(draft.acts)) });
+          syncDraftMeta(j);
+          if (locks.acts) { step.value = 's6'; window.Store.toast('幕次已锁定 · 可以编译过闸', 'good'); }
+        } catch (e) { window.Store.toast('幕次锁定失败：' + e.message, 'warn'); }
+        stageBusy.value = '';
+      }
+      async function assembleDraft() {
+        if (!locks.acts) { window.Store.toast('三个阶段尚未全部锁定', 'warn'); return; }
+        stageBusy.value = 'assemble';
+        try {
+          const j = await apiPost('/api/studio/draft/' + draft.draft_id + '/assemble', { world: draft.world, detail: draft.detail, acts: draft.acts });
+          draft.gate = j.gate; draft.scenario_id = j.scenario_id; draft.status = j.status;
+          syncDraftMeta(j);
+          S.studioJob = j.job; S.studioId = j.scenario_id;
+          hydrateFromJob(brief, j.job);
+          const ok = !!(j.gate && j.gate.ok);
+          window.Store.toast(ok ? '编译完成 · 结构+叙事闸门全绿，可开玩' : '编译完成 · 闸门未过，留在过闸步骤排查', ok ? 'good' : 'warn');
+          step.value = ok ? 's7' : 's6';
+          loadHistory();
+        } catch (e) { window.Store.toast('编译失败：' + e.message, 'warn'); }
+        stageBusy.value = '';
+      }
+      const stageMark = (id) => ({
+        s1: brief.hook.trim() ? 'edit' : '',
+        s2: draft.world ? (locks.truth ? 'ready' : 'edit') : '',
+        s3: draft.detail ? (locks.cast ? 'ready' : 'edit') : '',
+        s4: draft.acts ? (locks.acts ? 'ready' : 'edit') : '',
+        s5: 'edit',
+        s6: draft.gate ? (draft.gate.ok ? 'ready' : 'bad') : '',
+        s7: canPlay.value ? 'ready' : ''
+      }[id] || '');
+      const stageBar = (stage) => ({
+        truth: { busy: stageBusy.value === 'truth' || stageBusy.value === 'lock-truth', locking: stageBusy.value === 'lock-truth', gen: genTruth, genLabel: 'AI 写真相草案', lock: confirmTruth, lockLabel: '锁定真相 → 进角色', locked: locks.truth, ready: !!draft.world },
+        cast: { busy: stageBusy.value === 'cast' || stageBusy.value === 'lock-cast', locking: stageBusy.value === 'lock-cast', gen: genCast, genLabel: 'AI 写角色草案', lock: confirmCast, lockLabel: '锁定角色 → 进幕次', locked: locks.cast, ready: !!draft.detail },
+        acts: { busy: stageBusy.value === 'acts' || stageBusy.value === 'lock-acts', locking: stageBusy.value === 'lock-acts', gen: genActs, genLabel: 'AI 写幕次与线索', lock: confirmActs, lockLabel: '锁定幕次 → 去过闸', locked: locks.acts, ready: !!draft.acts }
+      }[stage] || null);
 
       const pickType = (id) => {
         const t = PACK_TYPES.find(x => x.id === id);
@@ -196,11 +382,12 @@
 
       async function generateAll() {
         const s = brief.hook.trim();
-        if (!s) { window.Store.toast('先写一句钩子', 'warn'); step.value = 'hook'; return; }
+        if (!s) { window.Store.toast('先写一句钩子', 'warn'); step.value = 's1'; return; }
         saveDraft(true);
         brief.voice.dm = brief.vibe.dm;
         brief.voice.comedy = brief.vibe.comedy;
         generating.value = true;
+        genNote.value = '蓝图构思中…';
         try {
           const r = await fetch('/api/studio/generate', {
             method: 'POST',
@@ -221,23 +408,40 @@
             return;
           }
           const j = await r.json();
-          if (j.ok && j.job) {
-            S.studioJob = j.job;
-            S.studioId = j.job.id;
-            hydrateFromJob(brief, j.job);
-            if (useLlm.value && j.job.provider === 'mock') {
+          let job = (j && j.job) || null;
+          if (!job && j && j.job_id) {
+            /* 202 异步受理契约：轮询 jobs 至终态（ready/failed），上限 90s */
+            for (let i = 0; i < 60; i++) {
+              await new Promise(res => setTimeout(res, 1500));
+              genNote.value = '写作与过闸中…（已等待 ' + Math.round((i + 1) * 1.5) + ' 秒）';
+              let pj = null;
+              try {
+                const pr = await fetch('/api/studio/jobs/' + encodeURIComponent(j.job_id));
+                if (pr.ok) pj = await pr.json();
+              } catch (e) { /* 瞬断继续轮询 */ }
+              const cand = pj && pj.job ? pj.job : (pj || null);
+              if (cand && (cand.status === 'ready' || cand.status === 'failed')) { job = cand; break; }
+            }
+          }
+          if (job && (job.id || job.status)) {
+            S.studioJob = job;
+            S.studioId = job.id;
+            hydrateFromJob(brief, job);
+            const gateOk = !!(job.gate && job.gate.ok);
+            if (useLlm.value && job.provider === 'mock') {
               window.Store.toast('AI 通道没走通，已自动回退骨架稿（闸门照常校验）', 'warn');
             }
-            window.Store.toast(j.notice || '新本已写成', (j.job.gate && j.job.gate.ok) ? 'good' : 'warn');
-            step.value = (j.job.gate && j.job.gate.ok) ? 'play' : 'gate';
+            window.Store.toast(gateOk ? '新本已写成并通过闸门' : '新本已写成，但闸门未过——停在过闸步骤排查', gateOk ? 'good' : 'warn');
+            step.value = gateOk ? 's7' : 's6';
             loadHistory();
           } else {
-            window.Store.toast('返回格式异常', 'warn');
+            window.Store.toast('生成超时或返回格式异常，请稍后重试', 'warn');
           }
         } catch (e) {
           window.Store.toast('无法连接档案局服务——请先启动本机服务后再试', 'warn');
         } finally {
           generating.value = false;
+          genNote.value = '';
         }
       }
 
@@ -250,7 +454,7 @@
             S.studioJob = j.job;
             S.studioId = j.job.id;
             hydrateFromJob(brief, j.job);
-            step.value = (j.job.gate && j.job.gate.ok) ? 'play' : 'gate';
+            step.value = (j.job.gate && j.job.gate.ok) ? 's7' : 's6';
           }
         } catch (e) { window.Store.toast('请先启动服务', 'warn'); }
       }
@@ -286,6 +490,8 @@
         S, L, step, useLlm, generating, history, brief, job, world, gate, acts, clues, nodes, culprit, people, bookCovers,
         draftSavedAt, snapshots, showVersions, saveError, visibleSteps, showAdvanced, resultTab, checks, health,
         canPlay, current, typeName, STEPS, PRESETS, PACK_TYPES, MOODS, CORE_MECHS, MECHS, MINIS, ACT_META,
+        hotItems, hotNote, hotLoading, loadHot, pickHot, genNote, narrCount, useZhihu,
+        draft, agentRows, stageStatus, stageBusy, locks, stageBar, beginDraft, unlockStage, genTruth, confirmTruth, genCast, confirmCast, genActs, confirmActs, assembleDraft,
         pickPreset, pickType, seatOf, generateAll, loadJob, play, playHistory, go, next, prev, avatarOf, tierLabel, markOf, saveDraft, clearDraft, restoreSnapshot,
         Store: window.Store
       };
@@ -293,31 +499,44 @@
     template: `
     <div class="studio-workbench">
       <header class="sw-hd">
-        <span class="sw-tag">LINE · 一句话 → 一本新剧本杀</span>
-        <h1>创一本 · 开发工作台</h1>
-        <p class="sw-sub">钩子决定案情。人名、地名、12 条线索、记忆和热搜都会按构思重写；过闸后套进原来的圆桌和搜证。</p>
-        <div class="sw-quickbar">
-          <span class="sw-draft-state" :class="{saved: draftSavedAt}">{{ draftSavedAt ? '草稿已保存 ' + draftSavedAt : '草稿尚未保存' }}</span>
-          <button type="button" class="sw-link" @click="saveDraft(true)">保存版本</button>
-          <button type="button" class="sw-link" @click="clearDraft">清除草稿</button>
-          <button type="button" class="sw-link" @click="showAdvanced = !showAdvanced">{{ showAdvanced ? '收起高级设置' : '展开高级设置' }}</button>
-          <button type="button" class="sw-link" @click="showVersions = !showVersions">草稿版本（{{ snapshots.length }}）</button>
+        <div class="sw-hd-main">
+          <span class="sw-tag">LINE · 一句话 → 一本新剧本杀</span>
+          <h1>创一本 · 开发工作台</h1>
+          <p class="sw-sub">钩子决定案情。人名、地名、12 条线索、记忆和热搜都会按构思重写；过闸后套进原来的圆桌和搜证。</p>
+          <div class="sw-quickbar">
+            <span class="sw-draft-state" :class="{saved: draftSavedAt}">{{ draftSavedAt ? '草稿已保存 ' + draftSavedAt : '草稿尚未保存' }}</span>
+            <button type="button" class="sw-link" @click="saveDraft(true)">保存版本</button>
+            <button type="button" class="sw-link" @click="clearDraft">清除草稿</button>
+            <button type="button" class="sw-link" @click="showAdvanced = !showAdvanced">{{ showAdvanced ? '收起高级设置' : '展开高级设置' }}</button>
+            <button type="button" class="sw-link" @click="showVersions = !showVersions">草稿版本（{{ snapshots.length }}）</button>
+          </div>
+          <div v-if="!checks.ok" class="sw-inline-checks">
+            <b>生成前检查：</b><span v-for="e in checks.errors" :key="e">{{ e }}</span>
+          </div>
         </div>
-        <div v-if="!checks.ok" class="sw-inline-checks">
-          <b>生成前检查：</b><span v-for="e in checks.errors" :key="e">{{ e }}</span>
-        </div>
+        <aside class="sw-hd-status" aria-label="当前生产状态">
+          <span class="sw-status-kicker">当前生产阶段</span>
+          <strong>{{ current.no }} · {{ current.title }}</strong>
+          <span>{{ draft.draft_id ? '服务端草稿已建立' : '先从一句话立项' }}</span>
+        </aside>
       </header>
 
       <div class="sw-body">
         <aside class="sw-rail" aria-label="生产线">
+          <div class="sw-rail-head">
+            <span class="sw-rail-kicker">制作流程</span>
+            <span class="sw-rail-count">{{ (stepIndex + 1) }} / {{ visibleSteps.length }}</span>
+          </div>
           <ol>
             <li v-for="s in visibleSteps" :key="s.id">
-              <button type="button" :class="['sw-step', markOf(s.id), { on: step === s.id }]" @click="go(s.id)">
+              <button type="button" :class="['sw-step', markOf(s.id), { on: step === s.id }]" @click="go(s.id)" :aria-current="step === s.id ? 'step' : undefined">
                 <em>{{ s.no }}</em>
                 <span>{{ s.title }}</span>
+                <i aria-hidden="true"></i>
               </button>
             </li>
           </ol>
+          <p class="sw-rail-note">先定真相，再分配角色与线索。每个阶段都可重写、锁定、回退。</p>
         </aside>
 
         <section class="sw-stage">
@@ -329,27 +548,45 @@
             <div class="sw-snapshots"><button v-for="(v,i) in snapshots" :key="i" @click="restoreSnapshot(v)">{{ v.brief.hook || '空白简报' }} · {{ new Date(v.savedAt).toLocaleTimeString() }} · 恢复</button></div>
           </section>
           <section class="sw-out sw-overview">
-            <h3>工作台概览</h3>
-            <p>{{ typeName }} · 4 人 / 6 地点 / 12 线索 · 三幕快本</p>
-            <p v-if="!job">写一句钩子即可生成，其余设定可选填。生成后可在「开局」查看海报、角色、证据和导演视角。</p>
+            <div class="sw-overview-head">
+              <div>
+                <span class="sw-section-kicker">工作台概览</span>
+                <h3>{{ typeName }}</h3>
+              </div>
+              <span class="sw-overview-count">4 人 · 6 地 · 12 线索</span>
+            </div>
+            <p v-if="!job">写一句钩子即可立项。其余设定可选填，生成后在「开局」查看海报、角色、证据与导演视角。</p>
             <template v-else>
-              <p>{{ world.title }} · {{ gate.ok ? '校验通过' : '需要修复' }}</p>
+              <p class="sw-overview-title">{{ world.title }} <span :class="gate.ok ? 'is-good' : 'is-bad'">{{ gate.ok ? '校验通过' : '需要修复' }}</span></p>
               <div class="sw-health"><div v-for="h in health" :key="h.key" class="sw-health-row"><b>{{ h.key }}</b><span class="sw-health-track"><i :style="{width: h.value + '%'}"></i></span><em>{{ h.hint }}</em></div></div>
-              <p>以上为结构配额检查，不代表剧情质量。</p>
-              <button class="sw-link" @click="go('play')">查看生成结果 →</button>
+              <p class="sw-overview-note">结构配额检查，不代表剧情质量。</p>
+              <button class="sw-link" @click="go('s7')">查看生成结果 →</button>
             </template>
+          </section>
+          <section v-if="draft.draft_id && agentRows.length" class="sw-out sw-agents" aria-label="生产智能体状态">
+            <div class="sw-agents-head"><div><span class="sw-section-kicker">后台诊断</span><h3>生产智能体状态</h3></div><span class="dim tiny">服务端编排 · 人工门禁</span></div>
+            <div class="sw-agent-row" v-for="a in agentRows" :key="a.stage">
+              <div class="sw-agent-main"><i class="sw-agent-pulse" :class="'is-' + (a.status || 'pending')" aria-hidden="true"></i><b>{{ a.name || a.agent_id || a.stage }}</b><span class="sw-agent-status" :class="'is-' + (a.status || 'pending')">{{ stageStatus(a.status) }}</span></div>
+              <div class="sw-agent-meta"><span>阶段 {{ a.stage }}</span><span>依赖 {{ a.dependencies }}</span><span>引擎 {{ a.provider || '待定' }}</span><span>尝试 {{ a.attempts || 0 }} · 重试 {{ a.retry || 0 }}/{{ a.max_retries || 0 }}</span><span>人工 {{ a.human_gate ? '需要' : '无需' }}</span><span v-if="a.locked_at">已锁 {{ a.locked_at }}</span><button v-if="a.locked_at && a.stage !== 'assemble'" type="button" class="sw-agent-unlock" @click="unlockStage(a.stage)">解锁修改</button></div>
+              <div class="sw-agent-error" v-if="a.error">{{ a.error }}</div>
+            </div>
           </section>
           <p class="sw-why"><b>{{ current.no }} {{ current.title }}</b>{{ current.why }}</p>
 
-          <div v-if="step==='hook'" class="sw-pane">
+          <div v-if="step==='s1'" class="sw-pane">
             <label class="sw-lab">把人关进局里的那一句</label>
             <textarea v-model="brief.hook" rows="4" maxlength="200" placeholder="写一句梗概，或点下方预置…"></textarea>
+            <div class="sw-hot">
+              <button type="button" class="sw-link" :disabled="hotLoading" @click="loadHot">{{ hotItems.length ? '刷新知乎热榜' : '从知乎热榜挑个议题 ▸' }}</button>
+              <span class="dim tiny" v-if="hotNote">{{ hotNote }}</span>
+              <div class="sw-hot-list" v-if="hotItems.length">
+                <button v-for="(h, i) in hotItems" :key="'hot' + i" type="button" class="sw-preset" @click="pickHot(h.title)">{{ h.title }}</button>
+              </div>
+            </div>
             <div class="sw-presets">
               <button v-for="p in PRESETS" :key="p" type="button" class="sw-preset" @click="pickPreset(p)">{{ p }}</button>
             </div>
-          </div>
-
-          <div v-else-if="step==='type'" class="sw-pane">
+            <label class="sw-lab" style="margin-top:14px">本型基调</label>
             <div class="sw-picks">
               <button v-for="t in PACK_TYPES" :key="t.id" type="button" :class="['sw-pick', { on: brief.pack_type === t.id }]" @click="pickType(t.id)">
                 <b>{{ t.name }}</b>
@@ -357,9 +594,7 @@
               </button>
             </div>
             <p class="sw-hint">选本型会改案情气质（恐怖本换灭灯令，情感本换未寄出的信），并预勾机制。快本体量仍是 4 人 / 6 地 / 12 证，内容会换。</p>
-          </div>
-
-          <div v-else-if="step==='lock'" class="sw-pane">
+            <label class="sw-lab" style="margin-top:14px">封局设定</label>
             <div class="sw-fields">
               <label>时间盒<input v-model="brief.lock.timebox" placeholder="例：案发夜 20:00–23:00，21:00 锁门"></label>
               <label>空间<input v-model="brief.lock.space" placeholder="例：24 小时热榜机房"></label>
@@ -368,26 +603,41 @@
               <label>语气<input v-model="brief.lock.tone" placeholder="由本型预填，可改"></label>
               <label>主题<input v-model="brief.lock.theme" placeholder="例：热度不是真相"></label>
             </div>
-            <aside class="sw-out" v-if="job">
-              <h3>生成后的锁局</h3>
-              <p>{{ world.hook }}</p>
-              <ul><li v-for="r in (world.world_rules||[])" :key="r">{{ L.line(r) }}</li></ul>
-            </aside>
-          </div>
-
-          <div v-else-if="step==='camp'" class="sw-pane">
-            <div class="sw-fields">
-              <label>污染阵营对外名<input v-model="brief.camp.pollution" placeholder="污染 / 热度 / 黑雾"></label>
-              <label>可策反位对外名<input v-model="brief.camp.swayable" placeholder="可策反 / 夹心"></label>
-              <label>求真阵营对外名<input v-model="brief.camp.truth" placeholder="求真 / 守灯"></label>
-              <label>污染怎么赢<input v-model="brief.camp.win_pollution" placeholder="热度淹死真线索"></label>
-              <label>求真怎么赢<input v-model="brief.camp.win_truth" placeholder="证据卡指认真凶"></label>
+            <div class="sw-stagebar">
+              <button class="btn-start sw-run" :disabled="stageBusy==='s1'" @click="beginDraft">{{ stageBusy==='s1' ? '立项确认中…' : '确认立项 · 进入真相设计' }}</button>
+              <span class="dim tiny">行业铁律：真相未定，不写角色。</span>
             </div>
-            <label class="sw-llm"><input type="checkbox" v-model="brief.camp.public"><span>阵营本：对外公开阵营名（人设前加【阵营】；试玩包里只改称呼，不另写阵营字段）</span></label>
-            <p class="sw-hint">不能改成 3 凶或无凶——闸门要求 1 污染 + ≥1 可策反。改的是称呼和公开与否。</p>
           </div>
 
-          <div v-else-if="step==='cast'" class="sw-pane">
+          <div v-else-if="step==='s2'" class="sw-pane">
+            <div v-if="!draft.world" class="sw-hint">还没生成真相草案。这是设计总纲——它定了，角色和线索才知道往哪写。</div>
+            <template v-if="draft.world">
+              <label class="sw-lab">剧本名</label>
+              <input v-model="draft.world.title" maxlength="24">
+              <label class="sw-lab">一句话故事</label>
+              <input v-model="draft.world.logline" maxlength="80">
+              <label class="sw-lab">表面故事（开局全员以为的版本）</label>
+              <textarea v-model="draft.world.surface_truth" rows="3"></textarea>
+              <label class="sw-lab" style="margin-top:10px">里层真相（实际的局，直接改写）</label>
+              <textarea v-model="draft.world.inner_truth" rows="4"></textarea>
+              <template v-if="draft.world.culprit">
+                <label class="sw-lab">真凶槽（{{ draft.world.culprit.character || 'char_01' }} · 污染位）</label>
+                <div class="sw-fields">
+                  <label>罪行<input v-model="draft.world.culprit.crime"></label>
+                  <label>动机<input v-model="draft.world.culprit.motive"></label>
+                  <label>手法<input v-model="draft.world.culprit.method"></label>
+                </div>
+              </template>
+              <p class="sw-hint">真相树（{{ (draft.world.truth_nodes||[]).length }} 节点）与分钟级时间线在编译时按上述真相展开。</p>
+            </template>
+            <div class="sw-stagebar" v-if="stageBar('truth')">
+              <button type="button" class="btn-start sw-run" :disabled="stageBar('truth').busy" @click="stageBar('truth').gen">{{ stageBar('truth').locking ? '锁定中…' : (stageBar('truth').busy ? 'AI 写作中…' : (draft.world ? '重写真相草案' : stageBar('truth').genLabel)) }}</button>
+              <button type="button" class="btn-start" :disabled="!draft.world || stageBar('truth').locking" @click="stageBar('truth').lock">{{ stageBar('truth').locking ? '锁定中…' : stageBar('truth').lockLabel }}</button>
+              <span class="dim tiny" v-if="draft.providers.truth">引擎：{{ draft.providers.truth }}</span>
+            </div>
+          </div>
+
+          <div v-else-if="step==='s3'" class="sw-pane">
             <div class="sw-cast-grid">
               <article v-for="c in brief.cast" :key="c.id" class="sw-seat">
                 <img :src="avatarOf(c.id)" :alt="c.name || seatOf(c.id)">
@@ -398,62 +648,28 @@
                 <textarea v-model="c.public_bio" rows="2" placeholder="圆桌上别人能听到的自我介绍"></textarea>
               </article>
             </div>
-          </div>
-
-          <div v-else-if="step==='truth'" class="sw-pane">
+            <p class="sw-cast-note">每人自动获得：一层秘密（公开册不出现）、案发夜行动轨迹、可被戳破的伪证；真凶位另有作案手法与洗白话术。全部留空 = 交给 AI 按你锁定的真相现写。</p>
+            <label class="sw-lab" style="margin-top:14px">阵营称呼（可选）</label>
             <div class="sw-fields">
-              <label>表面故事<textarea v-model="brief.truth.surface" rows="2" placeholder="开局时全员以为发生了什么"></textarea></label>
-              <label>罪行<input v-model="brief.truth.crime" placeholder="真凶做了什么"></label>
-              <label>动机<input v-model="brief.truth.motive" placeholder="为什么做"></label>
-              <label>手法<input v-model="brief.truth.method" placeholder="怎么做、谁被裹挟"></label>
+              <label>污染阵营对外名<input v-model="brief.camp.pollution" placeholder="污染 / 热度 / 黑雾"></label>
+              <label>可策反位对外名<input v-model="brief.camp.swayable" placeholder="可策反 / 夹心"></label>
+              <label>求真阵营对外名<input v-model="brief.camp.truth" placeholder="求真 / 守灯"></label>
+              <label>污染怎么赢<input v-model="brief.camp.win_pollution" placeholder="热度淹死真线索"></label>
+              <label>求真怎么赢<input v-model="brief.camp.win_truth" placeholder="证据卡指认真凶"></label>
             </div>
-            <aside class="sw-out" v-if="job">
-              <h3>真相树（作者可见）</h3>
-              <p v-if="culprit.name">主谋槽：{{ culprit.name }} · {{ culprit.crime }}</p>
-              <ol><li v-for="n in nodes" :key="n.id"><b>{{ n.name }}</b> {{ n.desc }}</li></ol>
-            </aside>
+            <label class="sw-llm"><input type="checkbox" v-model="brief.camp.public"><span>阵营本：对外公开阵营名（人设前加【阵营】；试玩包里只改称呼，不另写阵营字段）</span></label>
+            <p class="sw-hint">不能改成 3 凶或无凶——闸门要求 1 污染 + ≥1 可策反。改的是称呼和公开与否。</p>
+            <div class="sw-stagebar" v-if="stageBar('cast')">
+              <button type="button" class="btn-start sw-run" :disabled="stageBar('cast').busy" @click="stageBar('cast').gen">{{ stageBar('cast').locking ? '锁定中…' : (stageBar('cast').busy ? 'AI 写作中…' : (draft.detail ? '按锁定真相重写角色' : stageBar('cast').genLabel)) }}</button>
+              <button type="button" class="btn-start" :disabled="!draft.detail || stageBar('cast').locking" @click="stageBar('cast').lock">{{ stageBar('cast').locking ? '锁定中…' : stageBar('cast').lockLabel }}</button>
+              <span class="dim tiny" v-if="draft.providers.cast">引擎：{{ draft.providers.cast }}</span>
+            </div>
           </div>
 
-          <div v-else-if="step==='board'" class="sw-pane">
+          <div v-else-if="step==='s4'" class="sw-pane">
             <label class="sw-lab">现场气质、关键物、伪证点子</label>
             <textarea v-model="brief.board_notes" rows="3" placeholder="例：前台横幅锁门；机房缺七分钟；茶水间三分糖"></textarea>
-            <aside class="sw-out" v-if="job">
-              <h3>落点 · {{ (world.locations||[]).length }} 地 / {{ clues.length }} 证</h3>
-              <div class="sw-chips"><span v-for="l in (world.locations||[])" :key="l.id" class="chip">{{ l.name }}</span></div>
-              <ul class="sw-clues">
-                <li v-for="c in clues" :key="c.id"><i :class="'t-'+c.tier">{{ tierLabel(c.tier) }}</i><b>{{ c.name }}</b><span>{{ L.place(c.location) }}</span></li>
-              </ul>
-            </aside>
-          </div>
-
-          <div v-else-if="step==='mech'" class="sw-pane">
-            <p class="sw-lab">核心（引擎锁死）</p>
-            <div class="sw-mods">
-              <label v-for="m in CORE_MECHS" :key="m.key" class="sw-mod on lock">
-                <input type="checkbox" checked disabled>
-                <b>{{ m.name }}</b><em>{{ m.play }}</em><span>{{ m.hint }}</span>
-              </label>
-            </div>
-            <p class="sw-lab">可插拔机制</p>
-            <div class="sw-mods">
-              <label v-for="m in MECHS" :key="m.key" :class="['sw-mod', { on: brief.modules[m.key] }]">
-                <input type="checkbox" v-model="brief.modules[m.key]">
-                <b>{{ m.name }}</b><em>{{ m.play }}</em><span>{{ m.hint }}</span>
-              </label>
-            </div>
-          </div>
-
-          <div v-else-if="step==='minis'" class="sw-pane">
-            <div class="sw-mods">
-              <label v-for="m in MINIS" :key="m.id" :class="['sw-mod', { on: brief.minis.includes(m.id) }]">
-                <input type="checkbox" :value="m.id" v-model="brief.minis">
-                <b>{{ m.name }}</b><em>{{ m.where }}</em><span>{{ m.hint }}</span>
-              </label>
-            </div>
-            <p class="sw-hint">这四件已在看山壳里。勾上的，开局后「小游戏厅」只列出它们；全不勾则不出现入口。</p>
-          </div>
-
-          <div v-else-if="step==='acts'" class="sw-pane">
+            <label class="sw-lab" style="margin-top:14px">三幕节奏与必揭露点</label>
             <div class="sw-act-grid">
               <article v-for="a in brief.acts" :key="a.id" class="sw-act">
                 <header>
@@ -469,9 +685,38 @@
                 <input v-model="a.comedy" placeholder="笑点 / 恐怖拍 / 搜错彩蛋">
               </article>
             </div>
+            <p class="sw-hint">线索由真相切碎：公开 / 限知 / 隐藏 / 伪证四层按幕发放，编译时落盘（12 条 + fake）。</p>
+            <div class="sw-stagebar" v-if="stageBar('acts')">
+              <button type="button" class="btn-start sw-run" :disabled="stageBar('acts').busy" @click="stageBar('acts').gen">{{ stageBar('acts').locking ? '锁定中…' : (stageBar('acts').busy ? 'AI 写作中…' : (draft.acts ? '按锁定真相与角色重写' : stageBar('acts').genLabel)) }}</button>
+              <button type="button" class="btn-start" :disabled="!draft.acts || stageBar('acts').locking" @click="stageBar('acts').lock">{{ stageBar('acts').locking ? '锁定中…' : stageBar('acts').lockLabel }}</button>
+              <span class="dim tiny" v-if="draft.providers.acts">引擎：{{ draft.providers.acts }}</span>
+            </div>
           </div>
 
-          <div v-else-if="step==='vibe'" class="sw-pane">
+          <div v-else-if="step==='s5'" class="sw-pane">
+            <p class="sw-lab">核心（引擎锁死）</p>
+            <div class="sw-mods">
+              <label v-for="m in CORE_MECHS" :key="m.key" class="sw-mod on lock">
+                <input type="checkbox" checked disabled>
+                <b>{{ m.name }}</b><em>{{ m.play }}</em><span>{{ m.hint }}</span>
+              </label>
+            </div>
+            <p class="sw-lab">可插拔机制</p>
+            <div class="sw-mods">
+              <label v-for="m in MECHS" :key="m.key" :class="['sw-mod', { on: brief.modules[m.key] }]">
+                <input type="checkbox" v-model="brief.modules[m.key]">
+                <b>{{ m.name }}</b><em>{{ m.play }}</em><span>{{ m.hint }}</span>
+              </label>
+            </div>
+            <p class="sw-lab" style="margin-top:14px">小游戏挂载</p>
+            <div class="sw-mods">
+              <label v-for="m in MINIS" :key="m.id" :class="['sw-mod', { on: brief.minis.includes(m.id) }]">
+                <input type="checkbox" :value="m.id" v-model="brief.minis">
+                <b>{{ m.name }}</b><em>{{ m.where }}</em><span>{{ m.hint }}</span>
+              </label>
+            </div>
+            <p class="sw-hint">这四件已在看山壳里。勾上的，开局后「小游戏厅」只列出它们；全不勾则不出现入口。</p>
+            <p class="sw-lab" style="margin-top:14px">氛围与口径</p>
             <div class="sw-picks">
               <button v-for="m in MOODS" :key="m.id" type="button" :class="['sw-pick', { on: brief.vibe.mood === m.id }]" @click="brief.vibe.mood = m.id">
                 <b>{{ m.name }}</b><span>{{ m.hint }}</span>
@@ -484,18 +729,23 @@
             </div>
           </div>
 
-          <div v-else-if="step==='gate'" class="sw-pane" :class="gate.ok ? 'gate-ok' : 'gate-bad'">
+          <div v-else-if="step==='s6'" class="sw-pane" :class="gate.ok ? 'gate-ok' : 'gate-bad'">
             <div class="sw-gate-status">
               <span class="sw-gate-dot"></span>
               <b>{{ job ? (gate.ok ? '闸门通过 · 可开玩' : '闸门未通过 · 停在创作台改') : '尚未编译' }}</b>
               <span class="dim tiny" v-if="job">{{ L.jobLine(job) }}</span>
             </div>
+            <p class="dim tiny" v-if="job">生成引擎：{{ job.provider === 'mock' ? '骨架稿' : (job.provider === 'main' ? 'AI 稿' : (job.provider || '未知')) }} · 叙事闸门（V1 时间线 / V2 可达性 / V3 伪证）{{ narrCount ? ('标记 ' + narrCount + ' 项') : '已通过' }}</p>
               <ul class="sw-gate-list ok" v-if="gate.ok"><li>这本新案情已过闸：4 人 / 6 地 / 12 条本局线索 / 破冰→搜证→指认</li></ul>
             <ul class="sw-gate-list bad" v-if="(gate.errors||[]).length"><li v-for="(e,i) in gate.errors" :key="'e'+i">{{ L.gateLine(e) }}</li></ul>
             <ul class="sw-gate-list warn" v-if="(gate.warnings||[]).length"><li v-for="(w,i) in gate.warnings" :key="'w'+i">{{ L.gateLine(w) }}</li></ul>
+            <div class="sw-stagebar" v-if="!job">
+              <button class="btn-start sw-run" :disabled="stageBusy==='assemble'" @click="assembleDraft">{{ stageBusy==='assemble' ? '编译过闸中…' : '编译过闸（三段终稿 → 剧本包）' }}</button>
+              <span class="dim tiny">前置：01 立项 · 02 锁定真相 · 03 锁定角色 · 04 锁定幕次</span>
+            </div>
           </div>
 
-          <div v-else-if="step==='play'" class="sw-pane">
+          <div v-else-if="step==='s7'" class="sw-pane">
             <template v-if="job">
               <div class="sw-result-tabs">
                 <button :class="{on: resultTab==='poster'}" @click="resultTab='poster'">海报</button>
@@ -544,32 +794,32 @@
       </div>
 
       <footer class="sw-dock">
-        <div class="sw-dock-nav">
-          <button type="button" class="btn-skip" @click="prev" :disabled="step==='hook'">上一步</button>
-          <button type="button" class="btn-skip" @click="next" :disabled="step==='play'">下一步</button>
+        <div class="sw-dock-primary">
+          <div class="sw-dock-nav">
+            <button type="button" class="btn-skip" @click="prev" :disabled="step==='s1'">← 上一步</button>
+            <button type="button" class="btn-skip" @click="next" :disabled="step==='s7'">下一步 →</button>
+          </div>
+          <button type="button" class="sw-close" @click="Store.closeStudio()">返回主菜单</button>
         </div>
-        <label class="sw-llm">
-          <input type="checkbox" v-model="useLlm">
-          <span>调用 AI 写中间稿（无 key 自动走骨架）</span>
-        </label>
-        <button class="btn-start sw-run" :disabled="generating" @click="generateAll">{{ generating ? '正在写这本新本…' : '生成这本新本' }}</button>
-        <button type="button" class="btn-skip" @click="Store.closeStudio()">返回主菜单</button>
+        <div class="sw-dock-options">
+          <label class="sw-llm">
+            <input type="checkbox" v-model="useLlm">
+            <span>调用 AI 写中间稿</span>
+          </label>
+          <label class="sw-llm"><input type="checkbox" v-model="useZhihu"><span>注入知乎素材</span></label>
+          <span class="dim tiny">无 key 自动走骨架 · 各阶段起草后由你锁定</span>
+        </div>
         <div class="sw-history" v-if="history.length">
-          <span class="dim tiny">已出的本
-            <button type="button" class="sw-link" @click="loadHistory">刷新</button>
-          </span>
-          <button v-for="h in history" :key="h.id" type="button" class="sw-hist-item" :title="h.id" @click="loadJob(h.id)">
-            {{ h.title || '未命名本' }}
-            <em :class="h.ok ? 'ok' : 'bad'">{{ h.ok ? '绿' : '红' }}</em>
-            <em v-if="h.provider === 'main'" class="ok">AI</em>
-            <em v-else-if="h.provider === 'mock'" class="dim">骨架</em>
-            <em v-if="h.created_at" class="dim">{{ (h.created_at || '').slice(5, 16).replace('T', ' ') }}</em>
-            <em v-if="h.ok && h.status === 'ready'" style="cursor:pointer;text-decoration:underline;margin-left:6px"
-               role="button" tabindex="0"
-               @click.stop="playHistory(h)" @keydown.enter.stop="playHistory(h)">重开一局 ▸</em>
-          </button>
+          <div class="sw-history-head"><span class="sw-section-kicker">最近剧本</span><button type="button" class="sw-link" @click="loadHistory">刷新</button></div>
+          <div class="sw-history-list">
+            <button v-for="h in history" :key="h.id" type="button" class="sw-hist-item" :title="h.id" @click="loadJob(h.id)">
+              <span class="sw-hist-title">{{ h.title || '未命名本' }}</span>
+              <span class="sw-hist-meta"><em :class="h.ok ? 'ok' : 'bad'">{{ h.ok ? '已过闸' : '待修复' }}</em><em v-if="h.provider === 'main'" class="ok">AI</em><em v-else-if="h.provider === 'mock'" class="dim">骨架</em><em v-if="h.created_at" class="dim">{{ (h.created_at || '').slice(5, 16).replace('T', ' ') }}</em></span>
+              <em v-if="h.ok && h.status === 'ready'" class="shelf-play" role="button" tabindex="0" @click.stop="playHistory(h)" @keydown.enter.stop="playHistory(h)">重开 →</em>
+            </button>
+          </div>
         </div>
-        <p v-else class="dim tiny sw-history-empty">还没有出过本——生成一次后，这里可以浏览、加载和重开你的剧本。</p>
+        <p v-else class="dim tiny sw-history-empty">还没有出过本。完成一次生产后，这里会保留最近剧本。</p>
       </footer>
     </div>`
   };

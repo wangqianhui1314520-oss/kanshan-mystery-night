@@ -17,7 +17,7 @@
       const echoCh = computed(() => S.echo && S.echo.challenge);
       const echoRes = computed(() => S.echo && S.echo.result);
       const evCites = computed(() => S.synth.concat(
-        Object.keys(S.clues).map(id => M.clues.find(c => c.id === id)).filter(Boolean)
+        Object.keys(S.clues).map(id => (window.Store.clueById && window.Store.clueById(id)) || M.clues.find(c => c.id === id)).filter(Boolean)
           .map(c => ({ id: c.id, name: c.name }))
       ));
       const kcCites = computed(() => Object.keys(S.kcards).map(id => M.kcards.find(k => k.id === id)).filter(Boolean));

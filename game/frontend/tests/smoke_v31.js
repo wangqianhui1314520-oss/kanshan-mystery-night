@@ -46,7 +46,7 @@ const sandbox = {
   console, setTimeout, clearTimeout, setInterval, clearInterval,
   URLSearchParams, Image: function () { return {}; },
   fetch: () => Promise.reject(new Error('no-net')),
-  location: { search: '', pathname: '/', href: 'file:///test/' },
+  location: { protocol: 'file:', search: '', pathname: '/', href: 'file:///test/' },
   localStorage: { getItem: () => null, setItem: () => { }, removeItem: () => { } },
   document: { getElementById: () => null, createElement: () => makeEl(), createTextNode: t => ({ textContent: t }), addEventListener: () => { } },
   Math, Date, JSON, Promise, Object, Array, String, Number, Boolean, Error, Set, Map
@@ -352,6 +352,7 @@ ok(customGoal.personal === '寻找钥匙' && customGoal.secret === '原创新秘
   ok(VIEWS.hotfeed.template.includes('!S.demo') && VIEWS.review.template.includes('mini-entry-row') && VIEWS.review.template.includes('v-if="!S.demo"'), '评委线隐藏头条竞标/复盘小游戏');
   ok(sandbox.window.APP_DEF.template.includes('antifraud-theater v-if="!S.demo"'), '评委线不挂反诈剧场');
   ok(sandbox.window.APP_DEF.template.includes('开 始 调 查') && sandbox.window.APP_DEF.template.includes('更多玩法'), '首页主 CTA 开始调查，房间/创一本收进更多');
+  ok(sandbox.window.APP_DEF.template.includes('menu-primary-actions') && sandbox.window.APP_DEF.template.includes('menu-judge-entry'), '首页主操作与评委线分组');
   ok(!VIEWS.chat.template.includes('上帝正俯视视角') && !VIEWS.chat.template.includes('#0B0F1C') && !VIEWS.hotfeed.template.includes('#0B0F1C') && !VIEWS.memory.template.includes('#0B0F1C'), '圆桌/热搜/诊室去掉色号泄漏');
   ok(typeof Store.startJudgeDemo === 'function' && sandbox.window.APP_DEF.template.includes('直达对照'), '首页可一键直达评委线');
   S.clues = {}; S.flaws = {};
@@ -419,20 +420,29 @@ ok(customGoal.personal === '寻找钥匙' && customGoal.secret === '原创新秘
   S.playerId = 'player:1';
   S.ap = 3;
   S.apMax = 3;
+  const waitForChatText = async (text, timeout = 5000) => {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      const hit = S.chat.slice().reverse().find(line => line && line.text === text);
+      if (hit) return hit;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return null;
+  };
 
   Store.applyEvent({
     type: 'chat', actor: 'ai:char_03',
     payload: { actor_kind: 'player', player_id: 'ai:char_03', text: '旧协议误判台词', char_id: 'char_01' }
   });
-  const aiOld = S.chat[S.chat.length - 1];
-  ok(aiOld && aiOld.actor === 'npc' && aiOld.name === '流量酱' && aiOld.text === '旧协议误判台词',
+  const aiOld = await waitForChatText('旧协议误判台词');
+  ok(aiOld && aiOld.actor === 'npc' && aiOld.name === '流量酱',
     'actor=ai:char_03 + actor_kind=player → npc/流量酱，不进 me');
 
   Store.applyEvent({
     type: 'chat', actor: 'player:ai:char_03',
     payload: { actor_kind: 'player', player_id: 'player:ai:char_03', text: '单人空席台词' }
   });
-  const aiSolo = S.chat[S.chat.length - 1];
+  const aiSolo = await waitForChatText('单人空席台词');
   ok(aiSolo && aiSolo.actor === 'npc' && aiSolo.name === '流量酱' && aiSolo.actor !== 'me',
     'actor=player:ai:char_03 → npc/流量酱');
 
@@ -440,7 +450,7 @@ ok(customGoal.personal === '寻找钥匙' && customGoal.secret === '原创新秘
     type: 'chat', actor: 'ai:char_03',
     payload: { actor_kind: 'npc', booklet_act: true, booklet_role: 'char_03', char_id: 'char_03', text: '按本自我介绍', faction: 'swayable' }
   });
-  const aiBook = S.chat[S.chat.length - 1];
+  const aiBook = await waitForChatText('按本自我介绍');
   ok(aiBook && aiBook.actor === 'npc' && aiBook.name === '流量酱' && aiBook.aiAct === true && !aiBook.faction,
     'booklet_act chat → npc 名=闭卷角色，不渲染 faction');
 

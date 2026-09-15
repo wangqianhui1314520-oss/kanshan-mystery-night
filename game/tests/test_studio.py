@@ -11,8 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from studio import generate, public_snapshot, validate_dir
+from studio import generate, load_job, public_snapshot, validate_dir
 from studio import scenario_dir as studio_scenario_dir
+from studio.evidence_contract import linked_clues_by_node
 from studio.tiers import PRESET_SEEDS
 from tests.conftest import SCENARIO_DIR
 
@@ -70,6 +71,19 @@ class TestStudioGenerate:
         assert ready_job["status"] == "ready"
         assert ready_job["id"].startswith("gen_")
 
+    def test_runtime_scenario_and_author_job_have_separate_contracts(self, ready_job):
+        """scenario.json 是引擎运行时包；_studio/job.json 才是作者完整稿。"""
+        root = studio_scenario_dir(ready_job["id"])
+        scenario = json.loads((root / "scenario.json").read_text(encoding="utf-8"))
+        author = load_job(ready_job["id"])
+        assert "world" not in scenario and "detail" not in scenario
+        assert "characters" not in scenario and "clues" not in scenario
+        assert scenario["scene_map"] and scenario["acts"]
+        assert author["world"] and author["detail"] and author["acts"]
+        assert len(author["detail"]["characters"]) == 4
+        assert len(author["detail"]["clues"]) == 12
+        assert author["status"] == "ready"
+
     def test_empty_seed_raises(self):
         with pytest.raises(ValueError, match="seed"):
             generate("")
@@ -92,6 +106,28 @@ class TestStudioGenerate:
         assert act1["stage"] == "break_ice"
         pack = public_snapshot(job["id"])
         assert (pack.get("modules") or {}).get("hotfeed") is False
+
+    def test_generated_pack_has_two_distinct_evidence_cards(self, ready_job):
+        root = studio_scenario_dir(ready_job["id"])
+        truth = json.loads((root / "truth.json").read_text(encoding="utf-8"))
+        clues = {
+            path.stem: json.loads(path.read_text(encoding="utf-8"))
+            for path in (root / "clues").glob("clue_*.json")
+        }
+        by_node = linked_clues_by_node(clues, truth.get("truth_nodes") or [])
+        assert all(len(ids) >= 3 for ids in by_node.values()), by_node
+        assert sum(len(ids) >= 3 for ids in by_node.values()) >= 2
+
+        from engine.evidence_chain import EvidenceChain
+        ec = EvidenceChain(root)
+        for cid, clue in ec.pool.items():
+            if clue.get("tier") != "fake" and clue.get("linked_truth_nodes"):
+                ec.released.setdefault(cid, set()).add("player:1")
+        while ec.try_compose("player:1"):
+            pass
+        cards = ec.evidence_cards("player:1")
+        assert len(cards) >= 2
+        assert len({tuple(card["truth_nodes"]) for card in cards}) >= 2
 
     def test_horror_pack_type_public_fields(self):
         job = generate(PRESET_SEEDS[0], brief={

@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 
+from .evidence_contract import linked_clues_by_node
 from .paths import BLACKLIST
 from .tiers import QUOTA
 
@@ -122,7 +123,8 @@ def validate_dir(scenario_dir, tier: str = "demo") -> dict:
                 break
 
     tn_ids = set()
-    for node in truth.get("truth_nodes") or []:
+    truth_nodes = truth.get("truth_nodes") or []
+    for node in truth_nodes:
         tn_ids.add(node["id"])
         proofs = node.get("proof_clues") or []
         if len(proofs) < q["proof_min"]:
@@ -130,6 +132,27 @@ def validate_dir(scenario_dir, tier: str = "demo") -> dict:
         for cid in proofs:
             if cid not in clues:
                 errors.append(f"REF: clue_pool 引用不存在")
+
+    # Generated demo packs must be playable under EvidenceChain.try_compose:
+    # three valid links make one card, and accusation requires two distinct
+    # truth-node cards. Small hand-built validator fixtures intentionally omit
+    # the full demo quota and are covered by the older V1/V2/V3 checks below.
+    if (os.environ.get("NARRATIVE_GATE", "") != "0"
+            and len(clues) == q["clues"]
+            and len(truth_nodes) == q["truth_nodes"]):
+        linked_by_tn = linked_clues_by_node(clues, truth_nodes)
+        composeable = 0
+        for node in truth_nodes:
+            tid = str(node.get("id") or "")
+            valid_links = linked_by_tn.get(tid, set())
+            if len(valid_links) < 3:
+                errors.append(
+                    f"NARR-EVIDENCE: {tid} 可合成线索不足（有效 linked_truth_nodes={len(valid_links)}，需 ≥3）")
+            else:
+                composeable += 1
+        if composeable < 2:
+            errors.append(
+                f"NARR-EVIDENCE: 至少需要 2 个可合成证据节点（当前 {composeable}）")
 
     char_ids = set(chars)
     for ch in chars.values():

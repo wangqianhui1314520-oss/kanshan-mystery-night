@@ -6,10 +6,36 @@ const assert = require('assert/strict');
 const root = path.resolve(__dirname, '..');
 const storage = new Map();
 const listeners = new Map();
+function decodeElement() {
+  const el = { children: [], textContent: '', _html: '' };
+  el.getAttribute = key => key === 'foo' ? el._decoded : null;
+  Object.defineProperty(el, 'innerHTML', {
+    get() { return el._html; },
+    set(value) {
+      el._html = String(value);
+      const match = el._html.match(/^<div foo="([\s\S]*)">(?:<\/div>)?$/);
+      if (match) {
+        el._decoded = match[1]
+          .replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+          .replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+        el.children = [el];
+      } else {
+        el.children = [];
+        el.textContent = el._html
+          .replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
+      }
+    }
+  });
+  return el;
+}
+const documentShim = { activeElement: null, createElement: decodeElement };
 const s = { console, setTimeout, clearTimeout, Date, JSON, Promise,
   localStorage: { getItem: k => storage.get(k) || null, setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) },
   fetch: async () => ({ ok: true, json: async () => ({ ok: true, items: [] }) }),
   addEventListener: (k,v) => listeners.set(k,v), removeEventListener: k => listeners.delete(k),
+  document: documentShim,
 };
 s.window = s; s.globalThis = s;
 vm.createContext(s);
@@ -19,7 +45,7 @@ load('js/studio/catalog.js'); load('js/studio/brief.js');
 s.Labels = new Proxy({}, { get: () => v => String(v || '') });
 s.Store = { state: s.Vue.reactive({ studioJob:null, studioId:'' }), toast:()=>{} };
 load('js/views/studio.js');
-s.document = { activeElement: null };
+s.document = documentShim;
 // Host nodes allow real component setup, computed state, template rendering and lifecycle.
 function node(type, text='') { return {type,text,children:[],parent:null,props:{},tagName:String(type).toUpperCase(),style:{},addEventListener(){},removeEventListener(){}}; }
 const renderer = s.Vue.createRenderer({
@@ -42,9 +68,9 @@ async function run(){
   assert.match(text(host),/工作台概览/);
   assert.match(text(host),/草稿版本/);
   assert.equal(component.checks.ok,true,'one-line generation does not require extra fields');
-  component.step='lock'; component.next(); assert.equal(component.step,'cast','skip collapsed camp step');
-  component.showAdvanced=true; await s.Vue.nextTick(); component.step='camp'; component.showAdvanced=false;
-  await s.Vue.nextTick(); assert.equal(component.step,'hook');
+  component.step='s2'; component.next(); assert.equal(component.step,'s3','next advances from truth to cast step');
+  component.showAdvanced=true; await s.Vue.nextTick(); assert.equal(component.showAdvanced,true,'advanced controls can open without changing stage'); component.showAdvanced=false;
+  await s.Vue.nextTick(); assert.equal(component.step,'s3','closing advanced controls preserves current stage');
   component.brief.hook='第一稿'; component.brief.truth.crime=''; component.brief.camp.public=false;
   component.brief.minis=[]; component.saveDraft(true);
   const first=component.snapshots[0];
@@ -57,7 +83,7 @@ async function run(){
   assert.equal(component.snapshots.length,2,'restore preserves current work');
   component.showVersions=true; await s.Vue.nextTick(); assert.match(text(host),/创作简报版本/);
   s.Store.state.studioJob={status:'ready',gate:{ok:true},world:{title:'测试剧本',locations:[]},detail:{clues:[],truth_nodes:[],characters:[],culprit:{name:'秘密主谋'}},acts:[]};
-  component.step='play'; await s.Vue.nextTick();
+  component.step='s7'; await s.Vue.nextTick();
   for(const label of ['海报','角色','证据','导演视角'])assert.match(text(host),new RegExp(label));
   assert.ok(!text(host).includes('秘密主谋'),'poster keeps director secrets hidden');
   component.resultTab='director'; await s.Vue.nextTick();assert.match(text(host),/秘密主谋/);

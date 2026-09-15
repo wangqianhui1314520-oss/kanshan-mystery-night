@@ -172,6 +172,41 @@ def test_ping_survives_slow_llm_chat(nb_server):
     _test_ping_survives_slow_llm_chat(nb_server)
 
 
+def test_ws_next_action_not_blocked_by_slow_chat(nb_server):
+    """公开聊天的慢 AI 回复后台化后，下一条 advance 必须立即被引擎裁决。"""
+    import asyncio
+
+    async def flow():
+        async with httpx.AsyncClient(timeout=15, trust_env=False) as c:
+            sid = (await c.post(
+                f"{BASE}/api/session",
+                json={"mode": "main", "player_id": "player:qa-chat"},
+            )).json()["session"]["session_id"]
+        url = f"ws://127.0.0.1:{PORT}/ws/{sid}?player_id=player:qa-chat"
+        async with websockets.connect(url, max_size=2**23) as ws:
+            await ws.recv()  # snapshot
+            started = time.monotonic()
+            await ws.send(json.dumps({
+                "type": "chat", "actor": "player:qa-chat",
+                "payload": {"text": "看山，关门", "target": "dm"},
+            }))
+            await ws.send(json.dumps({
+                "type": "advance", "actor": "player:qa-chat", "payload": {},
+            }))
+            stage = None
+            while time.monotonic() - started < 3.0:
+                evt = json.loads(await asyncio.wait_for(ws.recv(), timeout=3))
+                payload = evt.get("payload") or {}
+                if payload.get("event") == "stage_changed":
+                    stage = payload.get("stage")
+                    break
+            return stage, time.monotonic() - started
+
+    stage, elapsed = asyncio.run(flow())
+    assert stage == "investigate", (
+        f"聊天 AI 回复不应阻塞下一条 advance：stage={stage}, elapsed={elapsed:.2f}s")
+
+
 def test_ast_chat_pipeline_wraps_sync_llm():
     """AST 守护：run_action 聊天管线的 npc_chat/call_gateway 必须经 to_thread；
     管线内不得出现同步 time.sleep。"""

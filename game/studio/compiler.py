@@ -124,9 +124,10 @@ def compile_bibles(world: dict, detail: dict, acts: dict, *, scenario_id: str) -
         }
         _dump(cdir / f"{cid}.json", card)
 
-    from .player_book import build_books, write_books
+    from .player_book import build_books, write_books, write_runtime_booklets
     books = build_books(world, detail, acts)
     write_books(out, books)
+    write_runtime_booklets(out, world, detail, acts, books)
 
     mdir = out / "memory"
     if mdir.exists():

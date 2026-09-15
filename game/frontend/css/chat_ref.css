@@ -117,7 +117,54 @@
 .api-grid input{background:#101a30;border:1px solid rgba(78,143,244,.4);border-radius:6px;color:#fff;padding:6px 8px}
 .help-body p{margin:6px 0 0;font-size:12px;color:#B5D4F4;line-height:1.7}
 .help-body b{color:#fff}
-@media(max-width:640px){.ach-wall{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.ach-wall{grid-template-columns:repeat(2,1fr)}
+  .opening.phase-menu{align-items:flex-start;overflow:auto;padding:12px 10px 24px}
+  .opening.phase-menu .card.menu{width:min(100%,520px);max-height:none;padding:20px 16px;margin:auto 0}
+  .opening.phase-menu h1{font-size:22px;letter-spacing:1px}
+  .opening.phase-menu .sub{font-size:12px;margin-bottom:12px}
+  .opening.phase-menu .ai-status-card{margin:8px 0;padding:10px}
+  .opening.phase-menu .ai-status-card p{font-size:12px}
+  .opening.phase-menu .core-loop-card{margin:10px 0;padding:10px 12px}
+  .opening.phase-menu .core-loop-head{display:block;margin-bottom:8px}
+  .opening.phase-menu .core-loop-head span{display:block;margin-top:3px}
+  .opening.phase-menu .core-loop-steps{gap:4px}
+  .opening.phase-menu .core-loop-step{grid-template-columns:20px 1fr;column-gap:5px}
+  .opening.phase-menu .core-loop-step i{width:20px;height:20px;font-size:10px}
+  .opening.phase-menu .core-loop-step b{font-size:12px}
+  .opening.phase-menu .core-loop-step span{font-size:10px}
+  .opening.phase-menu .core-loop-arrow{font-size:14px}
+  .opening.phase-menu .soul-card{margin:10px 0;padding:10px 12px}
+  .opening.phase-menu .first-play-card{margin:10px 0;padding:10px 12px}
+  .opening.phase-menu .first-play-card p{font-size:11px}
+  .opening.phase-menu .menu-create-actions{grid-template-columns:1fr 1fr}
+  .opening.phase-menu .menu-section-head{margin-bottom:6px}
+  .opening.phase-menu .menu-judge-entry{align-items:flex-start}
+  .opening.phase-menu .menu-judge-entry .btn{min-height:38px}
+  .opening.phase-menu .menu-utility .menu-sub{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  .opening.phase-menu .menu-utility .menu-sub button{min-height:40px}
+}
+@media(max-width:768px){
+  .opening.phase-menu .card.menu{width:min(calc(100% - 16px),600px)}
+}
+@media(prefers-reduced-motion:reduce){
+  .opening.phase-menu *, .opening.phase-menu *::before, .opening.phase-menu *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+@media(max-width:375px){
+  .opening.phase-menu{padding-inline:8px}
+  .opening.phase-menu .card.menu{padding:16px 12px}
+  .opening.phase-menu h1{font-size:20px}
+  .opening.phase-menu .core-loop-step span,.opening.phase-menu .menu-mode-grid .btn-start small{font-size:10px}
+  .opening.phase-menu .menu-judge-entry small{font-size:10px}
+  .opening.phase-menu .menu-create-actions{grid-template-columns:1fr}
+  .opening.phase-menu .menu-create-actions .studio-entry{order:-1}
+  .opening.phase-menu .menu-judge-entry{display:block}
+  .opening.phase-menu .menu-judge-entry .btn{width:100%;margin-top:8px}
+  .opening.phase-menu .menu-utility .menu-sub{grid-template-columns:repeat(2,1fr)}
+}
+@media(min-width:641px){
+  .opening.phase-menu .card.menu{max-width:760px}
+  .opening.phase-menu .menu-primary-actions{max-width:520px;margin-inline:auto}
+}
 
 /* 微信式"正在发言中"typing 气泡（AI 按席位顺序发言占位） */
 .cs-bubble.typing{border-style:dashed;color:#8FA8CF}
