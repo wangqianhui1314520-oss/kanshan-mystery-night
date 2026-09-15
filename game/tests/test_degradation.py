@@ -244,7 +244,11 @@ def test_openai_provider_explicit_creds_survive_sync_env(monkeypatch):
 def test_panel_main_config_displaces_zhida_slot(monkeypatch):
     """面板三件套齐全 → _llm_for_session 返回的 LLMClient 不注册 zhida 槽：
     call_gateway(provider="zhida") 降级落 main（DeepSeek 生效），而不是被
-    env 恒可用的知乎凭证永久抢占（面板配置失效的根因）。"""
+    env 恒可用的知乎凭证永久抢占（面板配置失效的根因）。
+
+    BYOK 隔离（2026-09-15）：凭证经 use_credentials 显式锁进 Provider 实例，
+    **不再写进程 env**（旧版断言 env 被改写 = 锁副作用本身，与跨会话凭证
+    借用问题同源，已随 P1 修复更新语义）。"""
     import os
 
     import server.main as main_mod
@@ -260,7 +264,14 @@ def test_panel_main_config_displaces_zhida_slot(monkeypatch):
     client = main_mod.GameServer._llm_for_session(main_mod.game_server, "__panel_test__")
     assert client is not None
     assert "zhida" not in client.providers, "面板配置存在时不得注册 zhida 槽位"
-    assert os.environ.get("LLM_BASE_URL") == "https://api.deepseek.com/v1"
+    prov_main = client.providers["main"]
+    assert prov_main.api_key == "sk-panel"
+    assert prov_main.base_url == "https://api.deepseek.com/v1"
+    assert prov_main.model == "deepseek-chat"
+    assert getattr(prov_main, "_explicit_creds", False), \
+        "面板凭证必须经 use_credentials 显式锁进实例（不落进程 env）"
+    assert os.environ.get("LLM_BASE_URL") != "https://api.deepseek.com/v1", \
+        "面板凭证不得泄漏到进程 env（否则未设 key 的会话会借到）"
     picked = client._pick("zhida")     # NPC 对话写死 provider="zhida"
     assert picked.name == "main"
     # 无面板配置的会话仍走默认通道（zhida 保留，行为不变）

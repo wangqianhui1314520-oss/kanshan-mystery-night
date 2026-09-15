@@ -245,13 +245,9 @@ class GameServer:
                         "player:1")
             # 所有 Agent（DM/NPC/法官/AI 坐席）统一复用知乎直答通道；
             # 规则引擎仍独立裁决，模型只负责演出与行动意图。
-            cfg = (getattr(app.state, "api_cfg", {}) or {}).get(sid) or {}
-            if cfg.get("llm_key"):
-                os.environ["LLM_API_KEY"] = cfg["llm_key"]
-                if cfg.get("llm_base"):
-                    os.environ["LLM_BASE_URL"] = cfg["llm_base"]
-                if cfg.get("llm_model"):
-                    os.environ["LLM_MODEL"] = cfg["llm_model"]
+            # BYOK 会话隔离（2026-09-15）：凭证经 _llm_for_session 显式注入
+            # LLMClient，不再写进程 env——env 是全局的，写玩家 key 会让
+            # 未设 key 的其他会话借用到（额度泄漏 + 并发覆盖竞态）。
             llm = self._llm_for_session(sid)
             scenario_path = resolve_session_scenario_dir(session.get("scenario_id"))
             rt = AgentRuntime(scenario_path, llm=llm, session_id=sid, player_id=host)
@@ -260,7 +256,13 @@ class GameServer:
         return rt
 
     def _llm_for_session(self, session_id: str):
-        """有完整 LLM 配置则建 LLMClient（设置面板 header / .env），否则 None 走启发式+skill。"""
+        """有完整 LLM 配置则建 LLMClient（设置面板 header / .env），否则 None 走启发式+skill。
+
+        BYOK 会话隔离（2026-09-15）：凭证经 Provider 显式注入（use_credentials），
+        不写进程 env——env 是全局单例，写玩家 key 会让未设 key 的其他会话借到
+        （额度泄漏），多会话并发时还会互相覆盖（Provider 快照竞态）。
+        env 只承载服务器 .env 注入的合法默认值，回退语义不变。
+        """
         cfg = (getattr(app.state, "api_cfg", {}) or {}).get(session_id) or {}
         key = cfg.get("llm_key") or os.environ.get("LLM_API_KEY") or ""
         base = (cfg.get("llm_base") or os.environ.get("LLM_BASE_URL") or "").rstrip("/")
@@ -273,8 +275,8 @@ class GameServer:
         zhihu_default_on = os.environ.get("ZHIHU_AI_DEFAULT", "1") not in (
             "0", "", "false", "False")
         if zhihu_secret and zhihu_default_on:
-            if self.gateway is not None:
-                self.gateway.access_secret = zhihu_secret
+            # 共享 gateway（每日导读等）恒用服务器 .env 凭证；玩家自带 secret
+            # 只经下方 per-session ZhidaProvider 注入，不得改写共享单例。
             if not (key and base and model):
                 # NPC/坐席高频对话统一走 LLMClient(zhida-agent)：网关 chat 的
                 # 默认 fast 模型不能扮演角色、且直答点睛限额仅 2/日，
@@ -286,24 +288,26 @@ class GameServer:
             return None
         panel_main = bool(cfg.get("llm_key") and cfg.get("llm_base")
                           and cfg.get("llm_model"))
-        os.environ["LLM_API_KEY"] = key
-        os.environ["LLM_BASE_URL"] = base
-        os.environ["LLM_MODEL"] = model
-        # 统一 AI 通道使用知乎直答 Provider；复用设置面板/赛事注入的官方密钥。
-        # 注意：env 即配置（Provider 运行时活读环境），此处有意持久写入；
-        # 需要零网络隔离的测试应在各自 fixture 中 delenv ZHIHU_*/LLM_*。
-        if "developer.zhihu.com" in base:
-            os.environ["ZHIHU_APP_KEY"] = key
         try:
-            from agents.llm_client import LLMClient, OpenAICompatProvider, MockProvider
+            from agents.llm_client import (LLMClient, OpenAICompatProvider,
+                                           MockProvider, ZhidaProvider)
             if panel_main:
                 # 用户在面板显式指定自建端点（如 DeepSeek）→ 本对局 AI 全量走
                 # main 通道：不注册 zhida 槽位，call_gateway(provider="zhida")
                 # 经 _pick 降级自然落 main——否则 env 里的知乎凭证恒可用、
                 # zhida 恒优先，面板配置永远不会生效（用户实测复现的根因）。
-                return LLMClient(providers={"main": OpenAICompatProvider(),
-                                            "mock": MockProvider()})
-            return LLMClient()
+                prov = OpenAICompatProvider()
+                prov.use_credentials(cfg["llm_key"], cfg["llm_base"], cfg["llm_model"])
+                return LLMClient(providers={"main": prov, "mock": MockProvider()})
+            # zhida/main 双槽显式注入（值 = 上方 cfg/env 回退链计算结果，与
+            # 旧版"先写 env 再快照"的行为逐字段等价），凭证不落进程 env。
+            zhida = ZhidaProvider()
+            if zhihu_secret and zhihu_secret != zhida.app_key:
+                zhida.use_credentials(zhihu_secret)
+            prov_main = OpenAICompatProvider()
+            prov_main.use_credentials(key, base, model)
+            return LLMClient(providers={"zhida": zhida, "main": prov_main,
+                                        "mock": MockProvider()})
         except Exception:
             return None
 

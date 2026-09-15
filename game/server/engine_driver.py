@@ -24,6 +24,7 @@ B 组要求的 F 侧联动（engine/STATUS.md §五-遗留 1）全部落地：
 服务重启后按固定 seed 重建引擎实例并确定性回放（引擎全部裁决为确定性，无 AI 参与）。
 """
 import json
+import secrets
 import time
 from pathlib import Path
 
@@ -435,7 +436,11 @@ class EngineDriver:
             except Exception:
                 ai_seat_count = 0
         session = {
-            "session_id": session_id or f"s_{time.strftime('%Y%m%d')}_{int(now * 1000) % 100000000:08d}",
+            # sid 后缀用加密随机（2026-09-15 P2 修复）：旧版毫秒时间戳可枚举
+            # （知道大致创建时间即可爆破当天会话，GET /api/session/{sid} 无鉴权，
+            # 会暴露他局对局内容与掩码 key 前缀）。8 hex ≈ 4.3e9 空间不可预测；
+            # 保留 s_日期_ 前缀维持日志/排查习惯，存量旧格式 sid 不受影响。
+            "session_id": session_id or f"s_{time.strftime('%Y%m%d')}_{secrets.token_hex(4)}",
             "mode": mode,
             "engine": "engine_v3",
             "created_at": now,

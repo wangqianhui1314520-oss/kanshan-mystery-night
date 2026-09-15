@@ -283,6 +283,13 @@ class ZhidaProvider(Provider):
         except ValueError:
             self.timeout = 30.0
 
+    def use_credentials(self, app_key: str) -> None:
+        """注入显式凭证（BYOK 会话隔离）：仅锁定本实例，不写进程 env。
+
+        与 OpenAICompatProvider.use_credentials 对称——未调用时行为完全不变。
+        """
+        self.app_key = (app_key or "").strip()
+
     def available(self) -> bool:
         return bool(self.app_key) and self.budget.allow()
 

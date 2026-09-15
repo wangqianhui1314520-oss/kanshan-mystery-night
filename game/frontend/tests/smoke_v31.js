@@ -218,9 +218,14 @@ ok(customGoal.personal === '寻找钥匙' && customGoal.secret === '原创新秘
 
   /* ===== [6] 终局报告 ===== */
   console.log('\n[6] 终局报告');
+  S.voteResult = null; S.ended = false; S.ending = null; S.view = 'vote';
+  Store.applyEvent({ type: 'vote', payload: { target: 'char_03', voters: 1, needed: 2, evidence: [], coverage: { pct: 80, hit: [] } } });
+  ok(!!S.voteResult && S.voteResult.voters === 1, '未齐票先落账 voteResult，玩家不会误判无响应');
+  ok(S.toasts.some(t => String(t.text).includes('指认已记录')), '未齐票显示即时指认反馈');
   Store.applyEvent({ type: 'vote', payload: { target: 'char_03', evidence: [], coverage: { pct: 80, hit: [] }, ending: 'truth' } });
-  Store.applyEvent({ type: 'ending', payload: { ending_id: 'truth' } });
+  Store.applyEvent({ type: 'ending', payload: { ending_id: 'truth', title: '真相大白', desc: '终局摘要已生成' } });
   ok(S.ended === true && !!S.report, 'ending → mock 侦探报告自动生成');
+  ok(S.view === 'ending' && S.endingSummary && S.endingSummary.title === '真相大白', '终局即时切页并保留引擎结算摘要');
   ok(Array.isArray(S.report.badges), '报告徽章按统计产出');
 
   /* ===== [7] P3 鱼干微光点（collectibles_p3.md 全链路） ===== */

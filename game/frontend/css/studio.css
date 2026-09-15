@@ -110,6 +110,8 @@
 }
 .studio-workbench textarea:focus,
 .studio-workbench input:focus{outline:none;border-color:#c49a3a}
+.studio-workbench textarea:focus-visible,
+.studio-workbench input:focus-visible{outline:2px solid #c49a3a;outline-offset:1px}
 
 .studio-workbench .sw-fields{
   display:grid;grid-template-columns:1fr 1fr;gap:10px 12px
@@ -371,6 +373,7 @@
   padding:6px 9px;font-family:inherit;font-size:12px;line-height:1.5}
 .studio-workbench .sw-seat input::placeholder,.studio-workbench .sw-seat textarea::placeholder{color:#8a8070}
 .studio-workbench .sw-seat input:focus,.studio-workbench .sw-seat textarea:focus{outline:none;border-color:#c49a3a}
+.studio-workbench .sw-seat input:focus-visible,.studio-workbench .sw-seat textarea:focus-visible{outline:2px solid #c49a3a;outline-offset:1px}
 .studio-workbench .sw-cast-note{margin:8px 0 0;font-size:11px;color:#9a9078;line-height:1.6}
 
 /* ---------- 七阶段制作流水线 · 阶段操作条（2026-09-15） ---------- */
@@ -576,6 +579,8 @@
   .studio-workbench .sw-hist-meta{display:none}
   .studio-workbench .sw-hist-item .shelf-play{display:none}
   .studio-workbench .sw-hist-item:focus-visible{outline:2px solid #c49a3a;outline-offset:1px}
+  /* 工作台底部操作坞较高（导航+选项+最近剧本），抬高全局 toast 避免遮挡按钮 */
+  body:has(.studio-workbench) .toast-zone{bottom:calc(212px + env(safe-area-inset-bottom,0px))}
 }
 @media(max-width:520px){
   .opening.phase-studio .card.studio-card{padding:11px 11px 8px}

@@ -493,6 +493,7 @@
         hotItems, hotNote, hotLoading, loadHot, pickHot, genNote, narrCount, useZhihu,
         draft, agentRows, stageStatus, stageBusy, locks, stageBar, beginDraft, unlockStage, genTruth, confirmTruth, genCast, confirmCast, genActs, confirmActs, assembleDraft,
         pickPreset, pickType, seatOf, generateAll, loadJob, play, playHistory, go, next, prev, avatarOf, tierLabel, markOf, saveDraft, clearDraft, restoreSnapshot,
+        stepIndex,
         Store: window.Store
       };
     },
@@ -612,14 +613,14 @@
           <div v-else-if="step==='s2'" class="sw-pane">
             <div v-if="!draft.world" class="sw-hint">还没生成真相草案。这是设计总纲——它定了，角色和线索才知道往哪写。</div>
             <template v-if="draft.world">
-              <label class="sw-lab">剧本名</label>
-              <input v-model="draft.world.title" maxlength="24">
-              <label class="sw-lab">一句话故事</label>
-              <input v-model="draft.world.logline" maxlength="80">
-              <label class="sw-lab">表面故事（开局全员以为的版本）</label>
-              <textarea v-model="draft.world.surface_truth" rows="3"></textarea>
-              <label class="sw-lab" style="margin-top:10px">里层真相（实际的局，直接改写）</label>
-              <textarea v-model="draft.world.inner_truth" rows="4"></textarea>
+              <label class="sw-lab" for="sw-world-title">剧本名</label>
+              <input id="sw-world-title" v-model="draft.world.title" maxlength="24" aria-label="剧本名">
+              <label class="sw-lab" for="sw-world-logline">一句话故事</label>
+              <input id="sw-world-logline" v-model="draft.world.logline" maxlength="80" aria-label="一句话故事">
+              <label class="sw-lab" for="sw-world-surface">表面故事（开局全员以为的版本）</label>
+              <textarea id="sw-world-surface" v-model="draft.world.surface_truth" rows="3" aria-label="表面故事"></textarea>
+              <label class="sw-lab" style="margin-top:10px" for="sw-world-inner">里层真相（实际的局，直接改写）</label>
+              <textarea id="sw-world-inner" v-model="draft.world.inner_truth" rows="4" aria-label="里层真相"></textarea>
               <template v-if="draft.world.culprit">
                 <label class="sw-lab">真凶槽（{{ draft.world.culprit.character || 'char_01' }} · 污染位）</label>
                 <div class="sw-fields">
@@ -631,8 +632,8 @@
               <p class="sw-hint">真相树（{{ (draft.world.truth_nodes||[]).length }} 节点）与分钟级时间线在编译时按上述真相展开。</p>
             </template>
             <div class="sw-stagebar" v-if="stageBar('truth')">
-              <button type="button" class="btn-start sw-run" :disabled="stageBar('truth').busy" @click="stageBar('truth').gen">{{ stageBar('truth').locking ? '锁定中…' : (stageBar('truth').busy ? 'AI 写作中…' : (draft.world ? '重写真相草案' : stageBar('truth').genLabel)) }}</button>
-              <button type="button" class="btn-start" :disabled="!draft.world || stageBar('truth').locking" @click="stageBar('truth').lock">{{ stageBar('truth').locking ? '锁定中…' : stageBar('truth').lockLabel }}</button>
+              <button type="button" class="btn-start sw-run" :disabled="stageBar('truth').busy || stageBar('truth').locked" @click="stageBar('truth').gen">{{ stageBar('truth').locking ? '锁定中…' : (stageBar('truth').busy ? 'AI 写作中…' : (stageBar('truth').locked ? '真相已锁定（解锁后可改写）' : (draft.world ? '重写真相草案' : stageBar('truth').genLabel))) }}</button>
+              <button type="button" class="btn-start" :disabled="!draft.world || stageBar('truth').locking || stageBar('truth').locked" @click="stageBar('truth').lock">{{ stageBar('truth').locking ? '锁定中…' : (stageBar('truth').locked ? '已锁定' : stageBar('truth').lockLabel) }}</button>
               <span class="dim tiny" v-if="draft.providers.truth">引擎：{{ draft.providers.truth }}</span>
             </div>
           </div>
@@ -642,10 +643,10 @@
               <article v-for="c in brief.cast" :key="c.id" class="sw-seat">
                 <img :src="avatarOf(c.id)" :alt="c.name || seatOf(c.id)">
                 <header><b>{{ seatOf(c.id) }}</b></header>
-                <input v-model="c.name" :placeholder="'名字 · ' + seatOf(c.id)">
-                <input v-model="c.archetype" placeholder="公开人设 / 职业钩子">
-                <input v-model="c.comedy_hook" placeholder="一句腔调">
-                <textarea v-model="c.public_bio" rows="2" placeholder="圆桌上别人能听到的自我介绍"></textarea>
+                <input v-model="c.name" :placeholder="'名字 · ' + seatOf(c.id)" :aria-label="seatOf(c.id) + ' 名字'">
+                <input v-model="c.archetype" placeholder="公开人设 / 职业钩子" :aria-label="seatOf(c.id) + ' 公开人设'">
+                <input v-model="c.comedy_hook" placeholder="一句腔调" :aria-label="seatOf(c.id) + ' 一句腔调'">
+                <textarea v-model="c.public_bio" rows="2" placeholder="圆桌上别人能听到的自我介绍" :aria-label="seatOf(c.id) + ' 自我介绍'"></textarea>
               </article>
             </div>
             <p class="sw-cast-note">每人自动获得：一层秘密（公开册不出现）、案发夜行动轨迹、可被戳破的伪证；真凶位另有作案手法与洗白话术。全部留空 = 交给 AI 按你锁定的真相现写。</p>
@@ -660,8 +661,8 @@
             <label class="sw-llm"><input type="checkbox" v-model="brief.camp.public"><span>阵营本：对外公开阵营名（人设前加【阵营】；试玩包里只改称呼，不另写阵营字段）</span></label>
             <p class="sw-hint">不能改成 3 凶或无凶——闸门要求 1 污染 + ≥1 可策反。改的是称呼和公开与否。</p>
             <div class="sw-stagebar" v-if="stageBar('cast')">
-              <button type="button" class="btn-start sw-run" :disabled="stageBar('cast').busy" @click="stageBar('cast').gen">{{ stageBar('cast').locking ? '锁定中…' : (stageBar('cast').busy ? 'AI 写作中…' : (draft.detail ? '按锁定真相重写角色' : stageBar('cast').genLabel)) }}</button>
-              <button type="button" class="btn-start" :disabled="!draft.detail || stageBar('cast').locking" @click="stageBar('cast').lock">{{ stageBar('cast').locking ? '锁定中…' : stageBar('cast').lockLabel }}</button>
+              <button type="button" class="btn-start sw-run" :disabled="stageBar('cast').busy || stageBar('cast').locked" @click="stageBar('cast').gen">{{ stageBar('cast').locking ? '锁定中…' : (stageBar('cast').busy ? 'AI 写作中…' : (stageBar('cast').locked ? '角色已锁定（解锁后可改写）' : (draft.detail ? '按锁定真相重写角色' : stageBar('cast').genLabel))) }}</button>
+              <button type="button" class="btn-start" :disabled="!draft.detail || stageBar('cast').locking || stageBar('cast').locked" @click="stageBar('cast').lock">{{ stageBar('cast').locking ? '锁定中…' : (stageBar('cast').locked ? '已锁定' : stageBar('cast').lockLabel) }}</button>
               <span class="dim tiny" v-if="draft.providers.cast">引擎：{{ draft.providers.cast }}</span>
             </div>
           </div>
@@ -677,18 +678,18 @@
                   <span>{{ ACT_META[a.id].ap }} · {{ ACT_META[a.id].verbs }}</span>
                 </header>
                 <p class="sw-hint">{{ ACT_META[a.id].lock }}</p>
-                <input v-model="a.name" placeholder="这一幕在海报上的名字">
-                <textarea v-model="a.brief" rows="2" placeholder="这一幕玩家在干什么"></textarea>
-                <input v-model="a.must_reveal" placeholder="必须先给到的信息">
-                <input v-model="a.must_not_reveal" placeholder="这一幕绝对不能爆的">
-                <input v-model="a.twist" placeholder="反转拍点">
-                <input v-model="a.comedy" placeholder="笑点 / 恐怖拍 / 搜错彩蛋">
+                <input v-model="a.name" placeholder="这一幕在海报上的名字" :aria-label="(ACT_META[a.id].stage) + ' 幕名'">
+                <textarea v-model="a.brief" rows="2" placeholder="这一幕玩家在干什么" :aria-label="(ACT_META[a.id].stage) + ' 玩家在干什么'"></textarea>
+                <input v-model="a.must_reveal" placeholder="必须先给到的信息" :aria-label="(ACT_META[a.id].stage) + ' 必须先给到的信息'">
+                <input v-model="a.must_not_reveal" placeholder="这一幕绝对不能爆的" :aria-label="(ACT_META[a.id].stage) + ' 绝对不能爆的'">
+                <input v-model="a.twist" placeholder="反转拍点" :aria-label="(ACT_META[a.id].stage) + ' 反转拍点'">
+                <input v-model="a.comedy" placeholder="笑点 / 恐怖拍 / 搜错彩蛋" :aria-label="(ACT_META[a.id].stage) + ' 笑点'">
               </article>
             </div>
             <p class="sw-hint">线索由真相切碎：公开 / 限知 / 隐藏 / 伪证四层按幕发放，编译时落盘（12 条 + fake）。</p>
             <div class="sw-stagebar" v-if="stageBar('acts')">
-              <button type="button" class="btn-start sw-run" :disabled="stageBar('acts').busy" @click="stageBar('acts').gen">{{ stageBar('acts').locking ? '锁定中…' : (stageBar('acts').busy ? 'AI 写作中…' : (draft.acts ? '按锁定真相与角色重写' : stageBar('acts').genLabel)) }}</button>
-              <button type="button" class="btn-start" :disabled="!draft.acts || stageBar('acts').locking" @click="stageBar('acts').lock">{{ stageBar('acts').locking ? '锁定中…' : stageBar('acts').lockLabel }}</button>
+              <button type="button" class="btn-start sw-run" :disabled="stageBar('acts').busy || stageBar('acts').locked" @click="stageBar('acts').gen">{{ stageBar('acts').locking ? '锁定中…' : (stageBar('acts').busy ? 'AI 写作中…' : (stageBar('acts').locked ? '幕次已锁定（解锁后可改写）' : (draft.acts ? '按锁定真相与角色重写' : stageBar('acts').genLabel))) }}</button>
+              <button type="button" class="btn-start" :disabled="!draft.acts || stageBar('acts').locking || stageBar('acts').locked" @click="stageBar('acts').lock">{{ stageBar('acts').locking ? '锁定中…' : (stageBar('acts').locked ? '已锁定' : stageBar('acts').lockLabel) }}</button>
               <span class="dim tiny" v-if="draft.providers.acts">引擎：{{ draft.providers.acts }}</span>
             </div>
           </div>
@@ -739,8 +740,8 @@
               <ul class="sw-gate-list ok" v-if="gate.ok"><li>这本新案情已过闸：4 人 / 6 地 / 12 条本局线索 / 破冰→搜证→指认</li></ul>
             <ul class="sw-gate-list bad" v-if="(gate.errors||[]).length"><li v-for="(e,i) in gate.errors" :key="'e'+i">{{ L.gateLine(e) }}</li></ul>
             <ul class="sw-gate-list warn" v-if="(gate.warnings||[]).length"><li v-for="(w,i) in gate.warnings" :key="'w'+i">{{ L.gateLine(w) }}</li></ul>
-            <div class="sw-stagebar" v-if="!job">
-              <button class="btn-start sw-run" :disabled="stageBusy==='assemble'" @click="assembleDraft">{{ stageBusy==='assemble' ? '编译过闸中…' : '编译过闸（三段终稿 → 剧本包）' }}</button>
+            <div class="sw-stagebar" v-if="!job || draft.draft_id">
+              <button class="btn-start sw-run" :disabled="stageBusy==='assemble' || !draft.draft_id" @click="assembleDraft">{{ stageBusy==='assemble' ? '编译过闸中…' : (job ? '重新编译过闸' : '编译过闸（三段终稿 → 剧本包）') }}</button>
               <span class="dim tiny">前置：01 立项 · 02 锁定真相 · 03 锁定角色 · 04 锁定幕次</span>
             </div>
           </div>

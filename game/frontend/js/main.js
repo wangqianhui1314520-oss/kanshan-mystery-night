@@ -230,7 +230,7 @@
         ];
         if (a === 1) return [
           { text: '搜查至少一个现场位置', done: searched },
-          { text: '取得关键芯片线索', done: !!(S.clues && (S.clues.clue_021 || S.clues.clue_028)) },
+          { text: '取得第一幕关键线索（泡面/横幅/鱼干/芯片均可）', done: !!(S.clues && ['clue_001', 'clue_002', 'clue_004', 'clue_006', 'clue_007', 'clue_021', 'clue_028'].some(k => S.clues[k])) },
           { text: '回到圆桌汇报并确认时间线', done: chatCount >= 2 }
         ];
         if (a === 2) return [
