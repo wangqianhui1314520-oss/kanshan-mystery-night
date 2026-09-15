@@ -71,6 +71,56 @@ def test_without_primary_keeps_zhida_default(server_main, monkeypatch, value):
     assert client._pick("zhida").name == "zhida"
 
 
+def test_primary_main_falls_back_to_zhida_when_main_fails():
+    """主通道（DeepSeek）抖动时必须回落备用通道，不能整局 ai_reply_failed。
+
+    回归背景：providers 收敛成 {main, mock} 后主通道一挂就无路可走，
+    比改动前（zhida 优先）更脆——这里用桩件锁住该行为。
+    """
+
+    class _Boom:
+        name = "main"
+
+        def available(self):
+            return True
+
+        def chat(self, *a, **k):
+            raise RuntimeError("HTTP 429 rate limited")
+
+    class _Backup:
+        name = "zhida"
+
+        def available(self):
+            return True
+
+        def chat(self, *a, **k):
+            return "回落通道接上了"
+
+    from server.main import _MainWithBackup
+    chain = _MainWithBackup(_Boom(), _Backup())
+    assert chain.available()
+    assert chain.chat("sys", "user") == "回落通道接上了"
+    assert chain.backup_used is True
+
+
+def test_primary_main_no_backup_reraises():
+    """无可用备用通道时，异常必须原样抛出（如实降级，不吞错）。"""
+
+    class _Boom:
+        name = "main"
+
+        def available(self):
+            return True
+
+        def chat(self, *a, **k):
+            raise RuntimeError("boom")
+
+    from server.main import _MainWithBackup
+    chain = _MainWithBackup(_Boom(), None)
+    with pytest.raises(RuntimeError, match="boom"):
+        chain.chat("sys", "user")
+
+
 def test_primary_main_ignored_when_credentials_incomplete(server_main, monkeypatch):
     """三件套不全时不该"半启用"：退回默认通道，避免注册一个空 main。"""
     monkeypatch.setenv("LLM_PRIMARY", "main")

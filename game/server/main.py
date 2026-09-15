@@ -114,6 +114,58 @@ def engine_mode() -> str:
     return "mock" if mock_enabled() else "engine"
 
 
+class _MainWithBackup:
+    """主通道（自建 LLM，如 DeepSeek）失败时自动回落备用通道（知乎官方 Agent）。
+
+    背景（2026-09-15 回归）：LLM_PRIMARY=main / 面板三件套会把 providers 收敛成
+    {main, mock}，主通道一旦抖动（限流/超时/模型名写错）就再无回落，NPC 直接
+    ai_reply_failed——比改动前（zhida 优先）更脆。这里在 main 槽位内做兜底链：
+    对外 name 仍是 main，_pick 语义不变，但 chat 失败会改用备用通道，对局不断流。
+    """
+
+    name = "main"
+
+    def __init__(self, primary, backup):
+        self.primary = primary
+        self.backup = backup
+        self.backup_used = False
+
+    def available(self) -> bool:
+        return bool(self.primary and self.primary.available()) or bool(
+            self.backup and self.backup.available())
+
+    # 诊断/探针读取的是 main 槽位的凭证信息（/api/ai/test 回显 model 等），
+    # 包一层后必须透传，否则诊断看到的是包装器而非真实端点。
+    @property
+    def model(self) -> str:
+        return getattr(self.primary, "model", "")
+
+    @property
+    def base_url(self) -> str:
+        return getattr(self.primary, "base_url", "")
+
+    @property
+    def api_key(self) -> str:
+        return getattr(self.primary, "api_key", "")
+
+    def __getattr__(self, item):
+        # 其余属性（_explicit_creds / timeout 等）透传给主通道，
+        # 保证既有诊断与断言看到的是真实端点实例的行为。
+        if item in ("primary", "backup"):
+            raise AttributeError(item)
+        return getattr(self.primary, item)
+
+    def chat(self, system: str, user: str, temperature: float = 0.8,
+             stream: bool = False) -> str:
+        try:
+            return self.primary.chat(system, user, temperature=temperature, stream=False)
+        except Exception:
+            if not (self.backup and self.backup.available()):
+                raise
+            self.backup_used = True
+            return self.backup.chat(system, user, temperature=temperature, stream=False)
+
+
 class GameServer:
     """WebSocket 房间管理（骨架签名保持：__init__ / on_connect / handle）。"""
 
@@ -311,6 +363,15 @@ class GameServer:
                                        if panel_main else (key, base, model))
                 prov = OpenAICompatProvider()
                 prov.use_credentials(_key, _base, _model)
+                # 主通道故障回落：知乎官方 Agent 作为备用（凭证可用时），
+                # 保证自建端点抖动时 NPC 仍能说话，而不是整局 ai_reply_failed。
+                _backup = None
+                if zhihu_secret:
+                    _backup = ZhidaProvider()
+                    if zhihu_secret != _backup.app_key:
+                        _backup.use_credentials(zhihu_secret)
+                if _backup is not None and _backup.available():
+                    prov = _MainWithBackup(prov, _backup)
                 return LLMClient(providers={"main": prov, "mock": MockProvider()})
             # zhida/main 双槽显式注入（值 = 上方 cfg/env 回退链计算结果，与
             # 旧版"先写 env 再快照"的行为逐字段等价），凭证不落进程 env。
@@ -790,8 +851,10 @@ class GameServer:
                     if llm_failed:
                         why = (llm.degrade_log[-1] if getattr(llm, "degrade_log", None)
                                else "") or "上游暂不可用"
+                        # 文案不写死通道名：主通道可能是自建 LLM（DeepSeek）
+                        # 也可能是官方直答，回落链两段都失败才走到这里。
                         failure = (f"AI 接口暂时未能返回回复（{why[:90]}）。"
-                                   "多为知乎直答限流，等 10 秒再试即可。")
+                                   "主通道与回落通道均未成功，等 10 秒再试即可。")
                     elif not reply:
                         failure = failure or "AI 未返回有效回复，请重试。"
             except Exception:
