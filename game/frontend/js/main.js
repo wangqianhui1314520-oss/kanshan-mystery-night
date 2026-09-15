@@ -1261,9 +1261,12 @@
               <option value="zhida-fast-1p5">zhida-fast-1p5 · 快速回答</option>
               <option value="zhida-thinking-1p5">zhida-thinking-1p5 · 深度思考</option>
               </optgroup>
+              <!-- 模型名必须与上游 /models 实测一致：DeepSeek 现网仅 deepseek-flash /
+                   deepseek-v4-pro 两个 id（2026-09-15 实跑 /models 取证），
+                   deepseek-chat / deepseek-v4-flash 等旧名会直接 404。 -->
               <optgroup label="DeepSeek（需填 API Key）">
-              <option value="deepseek-v4-flash">deepseek-v4-flash</option>
-              <option value="deepseek-chat">deepseek-chat · V3 兼容</option>
+              <option value="deepseek-flash">deepseek-flash · V4 快档</option>
+              <option value="deepseek-v4-pro">deepseek-v4-pro · V4 旗舰（推理）</option>
               </optgroup>
             </select></label>
               <button class="btn primary sm" @click="saveApi">保存 API 配置</button>
