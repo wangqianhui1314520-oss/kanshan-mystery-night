@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -28,9 +29,11 @@ RE_LITERAL = re.compile(
     r"/assets/([A-Za-z0-9_\-./{}()\w,\s]+\.(?:png|jpe?g|gif|svg|webp|mp4|webm|mp3|wav|ogg|aac|m4a))"
 )
 # 变量拼接：必须连同前缀变量一起捕获，否则丢掉子目录（IMG→images/、VID→videos/）
-RE_CONCAT = re.compile(r"\b(IMG|VID|AUD|SND|BUST|STILL|CARD)\s*\+\s*'([^']+)'")
-PREFIX_DIR = {"IMG": "images/", "VID": "videos/", "AUD": "audio/", "SND": "audio/", "BUST": "images/bust/", "STILL": "images/still/", "CARD": "images/card/"}
+RE_CONCAT = re.compile(r"\b(IMG|VID|AUD|SND|BUST|STILL|CARD|BASE)\s*\+\s*'([^']+)'")
+PREFIX_DIR = {"IMG": "images/", "VID": "videos/", "AUD": "audio/", "SND": "audio/", "BUST": "images/bust/", "STILL": "images/still/", "CARD": "images/card/", "BASE": "audio/"}
 RE_AUDIO = re.compile(r"(?:new\s+Audio\(|Audio\(|playSound\(|sfx\s*\()\s*['\"]([^'\"]+)['\"]")
+# 音频文件名字面量（sfx.js 字典式接线 file:'bgm_room_前台.wav'；含中文文件名——2026-09-15 审计发现正则漏中文致 88 条音频误报孤儿）
+RE_MEDIA = re.compile(r"['\"]([A-Za-z0-9_\-\u4e00-\u9fff]+\.(?:wav|mp3|ogg|m4a))['\"]")
 
 SCAN_EXT = {".js", ".css", ".html", ".py", ".pyi"}   # 服务端 .py 也带资产 URL，勿漏
 SKIP_PARTS = {"vendor"}
@@ -86,12 +89,16 @@ def collect() -> dict[str, set[tuple[str, str]]]:
                 rel = raw if raw.startswith(("audio/", "/")) else "audio/" + raw
                 rel = rel.lstrip("/")
                 found.setdefault(rel, set()).add((f"{rel_file}:{i}", "audio"))
+            for m in RE_MEDIA.finditer(line):
+                found.setdefault("audio/" + m.group(1), set()).add((f"{rel_file}:{i}", "media-literal"))
     return found
 
 
 def http_status(rel: str) -> int:
     try:
-        req = urllib.request.Request(f"{BASE}/assets/{rel}", method="HEAD")
+        # 中文文件名（如 bgm_room_前台.wav）必须 percent-encode，否则 urllib 直接抛错（2026-09-15 审计发现）
+        quoted = urllib.parse.quote(rel)
+        req = urllib.request.Request(f"{BASE}/assets/{quoted}", method="HEAD")
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status
     except urllib.error.HTTPError as e:
